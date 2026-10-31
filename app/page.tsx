@@ -1,8 +1,9 @@
+import { OrganizationSwitcher, UserButton } from "@clerk/nextjs"
+import { auth } from "@clerk/nextjs/server"
 import Image from "next/image"
 
 import {
   Empty,
-  EmptyContent,
   EmptyDescription,
   EmptyHeader,
   EmptyMedia,
@@ -10,9 +11,11 @@ import {
 } from "@/components/ui/empty"
 
 export default async function Page() {
+  await auth.protect({ unauthenticatedUrl: "/sign-in" })
+
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6">
-      <Empty className="justify-start pt-32">
+      <Empty className="flex-none">
         <EmptyHeader>
           <EmptyMedia>
             <Image src="/logo.svg" alt="Logo" width={48} height={48} />
@@ -25,8 +28,11 @@ export default async function Page() {
             own words. If you can describe it, you can play it.
           </EmptyDescription>
         </EmptyHeader>
-        {/* <EmptyContent className="max-w-2xl gap-6"></EmptyContent> */}
       </Empty>
+      <div className="flex items-center gap-4">
+        <UserButton />
+        <OrganizationSwitcher />
+      </div>
     </div>
   )
 }
