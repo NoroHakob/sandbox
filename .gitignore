@@ -40,3 +40,4 @@ next-env.d.ts
 .firecrawl/
 .clerk/
 .neon
+.claude/settings.local.json
