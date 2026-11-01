@@ -10,8 +10,11 @@ export async function createGame(prompt: string) {
   if (!userId) throw new Error("Unauthorized")
   if (!orgId) throw new Error("No active organization")
 
-  const title = prompt.trim()
-  if (!title) throw new Error("Prompt is required")
+  const trimmed = prompt.trim()
+  if (!trimmed) throw new Error("Prompt is required")
+
+  const title =
+    trimmed.length > 80 ? `${trimmed.slice(0, 79).trimEnd()}…` : trimmed
 
   const [game] = await db
     .insert(games)

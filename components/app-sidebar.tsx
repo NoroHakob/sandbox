@@ -150,9 +150,20 @@ export function AppSidebar({
             <SidebarMenuBadge>$1.00</SidebarMenuBadge>
           </SidebarMenuItem>
         </SidebarMenu>
-        <div className="flex items-center justify-between group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
+        <div className="flex items-center justify-between gap-2 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           <div className="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
-            <OrganizationSwitcher />
+            <OrganizationSwitcher
+              appearance={{
+                elements: {
+                  rootBox: "w-full! max-w-full",
+                  organizationSwitcherTrigger:
+                    "w-full! max-w-full justify-between!",
+                  organizationPreview: "min-w-0",
+                  organizationPreviewTextContainer: "min-w-0",
+                  organizationPreviewMainIdentifier: "truncate",
+                },
+              }}
+            />
           </div>
           <UserButton />
         </div>
