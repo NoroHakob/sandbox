@@ -41,3 +41,5 @@ next-env.d.ts
 .clerk/
 .neon
 .claude/settings.local.json
+
+.trigger
