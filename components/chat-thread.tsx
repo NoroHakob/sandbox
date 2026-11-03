@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import { useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
@@ -51,6 +52,13 @@ const messages = [
 ] as const
 
 export function ChatThread() {
+  const [input, setInput] = useState("")
+
+  function sendMessage(value: string) {
+    console.log(value)
+    setInput("")
+  }
+
   return (
     <div className="flex h-svh flex-col">
       <MessageScrollerProvider defaultScrollPosition="end">
@@ -90,7 +98,12 @@ export function ChatThread() {
         </MessageScroller>
       </MessageScrollerProvider>
       <div className="mx-auto w-full max-w-3xl shrink-0 px-4 pb-4">
-        <ChatComposer />
+        <ChatComposer
+          value={input}
+          onValueChange={setInput}
+          onSubmit={sendMessage}
+          placeholder="Ask for a change…"
+        />
       </div>
     </div>
   )

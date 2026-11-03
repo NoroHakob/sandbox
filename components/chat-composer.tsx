@@ -1,7 +1,6 @@
 "use client"
 
 import { ArrowUpIcon, ChevronDownIcon, GripHorizontalIcon } from "lucide-react"
-import { useState, useTransition } from "react"
 
 import {
   DropdownMenu,
@@ -15,35 +14,44 @@ import {
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group"
-import { createGame } from "@/lib/games/actions"
 
 const models = ["Kimi K3", "Claude Opus 5.5", "Claude Sonnet 5.5"]
 
-export function ChatComposer() {
-  const [prompt, setPrompt] = useState("")
-  const [isPending, startTransition] = useTransition()
+type ChatComposerProps = {
+  value: string
+  onValueChange: (value: string) => void
+  onSubmit: (value: string) => void
+  disabled?: boolean
+  placeholder?: string
+}
+
+export function ChatComposer({
+  value,
+  onValueChange,
+  onSubmit,
+  disabled = false,
+  placeholder,
+}: ChatComposerProps) {
+  const trimmed = value.trim()
 
   function submit() {
-    if (!prompt.trim() || isPending) return
-    startTransition(async () => {
-      await createGame(prompt)
-      setPrompt("")
-    })
+    if (!trimmed || disabled) return
+    onSubmit(trimmed)
   }
 
   return (
     <InputGroup>
       <InputGroupTextarea
-        placeholder="Describe the game you want to build..."
-        value={prompt}
-        onChange={(event) => setPrompt(event.target.value)}
+        placeholder={placeholder}
+        value={value}
+        onChange={(event) => onValueChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Enter" && !event.shiftKey) {
             event.preventDefault()
             submit()
           }
         }}
-        disabled={isPending}
+        disabled={disabled}
       />
       <InputGroupAddon align="block-end">
         <DropdownMenu>
@@ -64,7 +72,7 @@ export function ChatComposer() {
           className="ml-auto rounded-full"
           aria-label="Send"
           onClick={submit}
-          disabled={!prompt.trim() || isPending}
+          disabled={!trimmed || disabled}
         >
           <ArrowUpIcon />
         </InputGroupButton>
