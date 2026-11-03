@@ -1,5 +1,6 @@
 "use client"
 
+import { useChat } from "@ai-sdk/react"
 import Image from "next/image"
 import { useState } from "react"
 
@@ -15,47 +16,12 @@ import {
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
 
-const messages = [
-  {
-    id: "1",
-    role: "user",
-    content: "Make a voxel survival game set on a floating island.",
-  },
-  {
-    id: "2",
-    role: "assistant",
-    content:
-      "On it! I'll start with a procedurally generated floating island, a day/night cycle, and basic block mining and placing. Should hunger and health be part of the survival loop?",
-  },
-  {
-    id: "3",
-    role: "user",
-    content: "Yes, both. And add some hostile mobs that spawn at night.",
-  },
-  {
-    id: "4",
-    role: "assistant",
-    content:
-      "Got it. I've added hunger and health bars, plus slime mobs that spawn after dusk and chase the player. Crafting a sword from wood and stone will help you fend them off.",
-  },
-  {
-    id: "5",
-    role: "user",
-    content: "Can the island edges crumble if you mine too close to them?",
-  },
-  {
-    id: "6",
-    role: "assistant",
-    content:
-      "Done. Blocks near the edge now lose support when you mine beneath them and fall into the void after a short shake. Give it a try and let me know what to tune next.",
-  },
-] as const
-
 export function ChatThread() {
+  const { messages, sendMessage, status } = useChat()
   const [input, setInput] = useState("")
 
-  function sendMessage(value: string) {
-    console.log(value)
+  function submit(value: string) {
+    sendMessage({ text: value })
     setInput("")
   }
 
@@ -86,7 +52,13 @@ export function ChatThread() {
                         }
                         align={message.role === "user" ? "end" : "start"}
                       >
-                        <BubbleContent>{message.content}</BubbleContent>
+                        <BubbleContent>
+                          {message.parts.map((part, index) =>
+                            part.type === "text" ? (
+                              <span key={index}>{part.text}</span>
+                            ) : null
+                          )}
+                        </BubbleContent>
                       </Bubble>
                     </MessageContent>
                   </Message>
@@ -101,7 +73,8 @@ export function ChatThread() {
         <ChatComposer
           value={input}
           onValueChange={setInput}
-          onSubmit={sendMessage}
+          onSubmit={submit}
+          disabled={status === "submitted" || status === "streaming"}
           placeholder="Ask for a change…"
         />
       </div>

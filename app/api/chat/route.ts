@@ -1,4 +1,4 @@
-import { anthropic } from "@ai-sdk/anthropic"
+import { openai } from "@ai-sdk/openai"
 import { auth } from "@clerk/nextjs/server"
 import {
   convertToModelMessages,
@@ -15,7 +15,7 @@ export async function POST(req: Request) {
   const { messages }: { messages: UIMessage[] } = await req.json()
 
   const result = streamText({
-    model: anthropic("claude-sonnet-5-5"),
+    model: openai("gpt-6-luna"),
     messages: await convertToModelMessages(messages),
   })
 
