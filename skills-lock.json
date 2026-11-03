@@ -1,6 +1,13 @@
 {
   "version": 1,
   "skills": {
+    "daytona": {
+      "source": "daytona/skills",
+      "sourceType": "github",
+      "skillPath": "skills/daytona/SKILL.md",
+      "computedHash": "89fc9e3cd4500e20020e2e4f6378c00a6d7eeebd7645d7ac09aef65a871dde2a",
+      "installMode": "copy"
+    },
     "neon": {
       "source": "neondatabase/agent-skills",
       "sourceType": "github",
