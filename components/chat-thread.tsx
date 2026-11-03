@@ -38,7 +38,7 @@ export function ChatThread({
     startSession: ({ chatId }) => startChatSession({ chatId }),
     sessions: session && { [gameId]: session },
   })
-  const { messages, sendMessage, status } = useChat({
+  const { messages, sendMessage, stop, status } = useChat({
     id: gameId,
     messages: initialMessages,
     transport,
@@ -69,6 +69,15 @@ export function ChatThread({
     sendMessage({ text: value })
     setInput("")
   }
+
+  // useChat's stop() only closes the local stream, and a resumed stream
+  // doesn't own the turn, so also signal the run to abort its streamText
+  function cancel() {
+    stop()
+    transport.stopGeneration(gameId)
+  }
+
+  const generating = status === "submitted" || status === "streaming"
 
   return (
     <div className="flex h-svh flex-col">
@@ -124,7 +133,8 @@ export function ChatThread({
           value={input}
           onValueChange={setInput}
           onSubmit={submit}
-          disabled={status === "submitted" || status === "streaming"}
+          disabled={generating}
+          onStop={generating ? cancel : undefined}
           placeholder="Ask for a change…"
         />
       </div>

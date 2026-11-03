@@ -1,6 +1,11 @@
 "use client"
 
-import { ArrowUpIcon, ChevronDownIcon, GripHorizontalIcon } from "lucide-react"
+import {
+  ArrowUpIcon,
+  ChevronDownIcon,
+  GripHorizontalIcon,
+  SquareIcon,
+} from "lucide-react"
 
 import {
   DropdownMenu,
@@ -22,6 +27,8 @@ type ChatComposerProps = {
   onValueChange: (value: string) => void
   onSubmit: (value: string) => void
   disabled?: boolean
+  // When set, the send button becomes a stop button that calls it
+  onStop?: () => void
   placeholder?: string
 }
 
@@ -30,6 +37,7 @@ export function ChatComposer({
   onValueChange,
   onSubmit,
   disabled = false,
+  onStop,
   placeholder,
 }: ChatComposerProps) {
   const trimmed = value.trim()
@@ -66,16 +74,28 @@ export function ChatComposer({
             ))}
           </DropdownMenuContent>
         </DropdownMenu>
-        <InputGroupButton
-          variant="default"
-          size="icon-sm"
-          className="ml-auto rounded-full"
-          aria-label="Send"
-          onClick={submit}
-          disabled={!trimmed || disabled}
-        >
-          <ArrowUpIcon />
-        </InputGroupButton>
+        {onStop ? (
+          <InputGroupButton
+            variant="default"
+            size="icon-sm"
+            className="ml-auto rounded-full"
+            aria-label="Stop"
+            onClick={onStop}
+          >
+            <SquareIcon className="fill-current" />
+          </InputGroupButton>
+        ) : (
+          <InputGroupButton
+            variant="default"
+            size="icon-sm"
+            className="ml-auto rounded-full"
+            aria-label="Send"
+            onClick={submit}
+            disabled={!trimmed || disabled}
+          >
+            <ArrowUpIcon />
+          </InputGroupButton>
+        )}
       </InputGroupAddon>
     </InputGroup>
   )
