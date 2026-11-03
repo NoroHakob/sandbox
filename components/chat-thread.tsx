@@ -6,6 +6,7 @@ import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
+import { Markdown } from "@/components/markdown"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Message, MessageAvatar, MessageContent } from "@/components/ui/message"
 import {
@@ -89,11 +90,14 @@ export function ChatThread({
                       >
                         <BubbleContent>
                           {message.parts.map((part, index) =>
-                            part.type === "text" ? (
+                            part.type !== "text" ? null : message.role ===
+                              "assistant" ? (
+                              <Markdown key={index}>{part.text}</Markdown>
+                            ) : (
                               <span key={index} className="whitespace-pre-wrap">
                                 {part.text}
                               </span>
-                            ) : null
+                            )
                           )}
                         </BubbleContent>
                       </Bubble>
