@@ -32,3 +32,17 @@ export async function getGame(id: string) {
 
   return game ?? null
 }
+
+export async function getLatestGame() {
+  const { orgId } = await auth()
+  if (!orgId) return null
+
+  const [game] = await db
+    .select({ id: games.id, updatedAt: games.updatedAt })
+    .from(games)
+    .where(eq(games.orgId, orgId))
+    .orderBy(desc(games.updatedAt))
+    .limit(1)
+
+  return game ?? null
+}

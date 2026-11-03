@@ -1,5 +1,6 @@
 import { auth } from "@clerk/nextjs/server"
 import Image from "next/image"
+import { redirect } from "next/navigation"
 
 import { NewGameComposer } from "@/components/new-game-composer"
 import { Button } from "@/components/ui/button"
@@ -11,10 +12,23 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty"
+import { getLatestGame } from "@/lib/games/queries"
 import { suggestions } from "@/lib/games/suggestions"
 
-export default async function Page() {
+// The home page reopens a game active within this window
+const REOPEN_GAME_WINDOW_MS = 30 * 60 * 1000
+
+export default async function Page(props: PageProps<"/">) {
   await auth.protect({ unauthenticatedUrl: "/sign-in" })
+
+  // ?new asks for the composer explicitly, e.g. from the "New game" button
+  const { new: requestedNew } = await props.searchParams
+  if (requestedNew === undefined) {
+    const game = await getLatestGame()
+    if (game && Date.now() - game.updatedAt.getTime() < REOPEN_GAME_WINDOW_MS) {
+      redirect(`/games/${game.id}`)
+    }
+  }
 
   return (
     <div className="flex min-h-svh flex-col items-center justify-center gap-6">
