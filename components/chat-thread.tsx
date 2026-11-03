@@ -90,7 +90,9 @@ export function ChatThread({
                         <BubbleContent>
                           {message.parts.map((part, index) =>
                             part.type === "text" ? (
-                              <span key={index}>{part.text}</span>
+                              <span key={index} className="whitespace-pre-wrap">
+                                {part.text}
+                              </span>
                             ) : null
                           )}
                         </BubbleContent>

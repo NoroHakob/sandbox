@@ -33,9 +33,9 @@ export async function POST(req: Request) {
   const result = streamText({
     model: openai("gpt-6-luna"),
     instructions:
-      "You are a game design assistant. Keep replies short and concise (a few sentences).",
+      "You are a game design assistant. Reply in a medium length: one short paragraph or 4-6 bullet points. Be clear and specific, no long essays.",
     messages: await convertToModelMessages(messages),
-    maxOutputTokens: 800,
+    maxOutputTokens: 1200,
     providerOptions: {
       openai: {
         reasoningEffort: "low",
