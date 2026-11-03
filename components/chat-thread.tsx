@@ -3,7 +3,7 @@
 import { useChat } from "@ai-sdk/react"
 import { DefaultChatTransport, type UIMessage } from "ai"
 import Image from "next/image"
-import { useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
@@ -37,6 +37,23 @@ export function ChatThread({
     transport,
   })
   const [input, setInput] = useState("")
+
+  // A new game is stored with only the prompt, so request the reply once
+  const requestedFor = useRef<string | null>(null)
+  useEffect(() => {
+    if (requestedFor.current === gameId) return
+    if (initialMessages.at(-1)?.role !== "user") return
+
+    // useChat's cleanup calls chat.stop(), which aborts a request still being
+    // prepared, so StrictMode's simulated unmount would cancel a direct send.
+    // Defer it so that cleanup cancels the timer and the remount reschedules.
+    const timeout = setTimeout(() => {
+      requestedFor.current = gameId
+      // No argument: request a reply to the stored message without appending
+      sendMessage()
+    })
+    return () => clearTimeout(timeout)
+  }, [gameId, initialMessages, sendMessage])
 
   function submit(value: string) {
     sendMessage({ text: value })

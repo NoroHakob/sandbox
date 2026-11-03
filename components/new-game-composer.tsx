@@ -11,8 +11,8 @@ export function NewGameComposer() {
 
   function submit(value: string) {
     startTransition(async () => {
+      // Redirects to the new game on success
       await createGame(value)
-      setPrompt("")
     })
   }
 

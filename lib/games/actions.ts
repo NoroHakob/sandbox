@@ -2,8 +2,9 @@
 
 import { openai, type OpenAILanguageModelResponsesOptions } from "@ai-sdk/openai"
 import { auth } from "@clerk/nextjs/server"
-import { generateText } from "ai"
+import { generateId, generateText } from "ai"
 import { refresh } from "next/cache"
+import { redirect } from "next/navigation"
 
 import { db, games } from "@/lib/db"
 
@@ -19,13 +20,24 @@ export async function createGame(prompt: string) {
 
   const [game] = await db
     .insert(games)
-    .values({ orgId, title })
+    .values({
+      orgId,
+      title,
+      // The game page sees a trailing user message and requests the reply
+      messages: [
+        {
+          id: generateId(),
+          role: "user",
+          parts: [{ type: "text", text: trimmed }],
+        },
+      ],
+    })
     .returning({ id: games.id })
 
   // Re-render the (app) layout so the sidebar picks up the new game
   refresh()
 
-  return game
+  redirect(`/games/${game.id}`)
 }
 
 // Best effort: a failed or empty generation returns null so the caller falls back
