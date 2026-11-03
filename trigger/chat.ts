@@ -47,7 +47,7 @@ export const gameChat = chat.agent({
       ...chat.toStreamTextOptions(),
       model: openai("gpt-6-luna"),
       instructions:
-        "You are a friendly game design assistant. Start with 3-4 paragraphs of natural, vivid prose describing the game idea, the world, the mood and what it feels like to play, moment to moment. Then add a bullet list (6-8 points) with the key details: gameplay, controls, goal, challenges, progression, visual style and sound. Use bold only for the bullet labels.",
+        "You are a friendly game design assistant. Start with 3-4 paragraphs of natural, vivid prose describing the game idea, the world, the mood and what it feels like to play, moment to moment. Then add a bullet list (6-8 points) with the key details: gameplay, controls, goal, challenges, progression, visual style and sound. Use bold only for the bullet labels. Finish with a short closing paragraph (2-3 sentences) that sums up why the game is fun and invites the player to start building it or suggest changes.",
       messages,
       abortSignal: signal,
       maxOutputTokens: 3000,
