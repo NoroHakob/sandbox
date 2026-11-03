@@ -1,7 +1,9 @@
 "use client"
 
 import { useChat } from "@ai-sdk/react"
-import { DefaultChatTransport, type UIMessage } from "ai"
+import type { ChatSessionPersistedState } from "@trigger.dev/sdk/chat"
+import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react"
+import type { UIMessage } from "ai"
 import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 
@@ -17,25 +19,30 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
-
-// The server loads the stored thread, so only send the new message
-const transport = new DefaultChatTransport({
-  prepareSendMessagesRequest: ({ id, messages }) => ({
-    body: { id, message: messages.at(-1) },
-  }),
-})
+import { mintChatAccessToken, startChatSession } from "@/lib/games/chat-actions"
+import type { gameChat } from "@/trigger/chat"
 
 export function ChatThread({
   gameId,
   initialMessages,
+  session,
 }: {
   gameId: string
   initialMessages: UIMessage[]
+  // Stored after each turn, so a reload resumes the stream
+  session?: ChatSessionPersistedState
 }) {
+  const transport = useTriggerChatTransport<typeof gameChat>({
+    task: "game-chat",
+    accessToken: ({ chatId }) => mintChatAccessToken(chatId),
+    startSession: ({ chatId }) => startChatSession({ chatId }),
+    sessions: session && { [gameId]: session },
+  })
   const { messages, sendMessage, status } = useChat({
     id: gameId,
     messages: initialMessages,
     transport,
+    resume: !!session,
   })
   const [input, setInput] = useState("")
 
@@ -44,6 +51,8 @@ export function ChatThread({
   useEffect(() => {
     if (requestedFor.current === gameId) return
     if (initialMessages.at(-1)?.role !== "user") return
+    // A stored session means the reply was already requested; resume streams it
+    if (session) return
 
     // useChat's cleanup calls chat.stop(), which aborts a request still being
     // prepared, so StrictMode's simulated unmount would cancel a direct send.
@@ -54,7 +63,7 @@ export function ChatThread({
       sendMessage()
     })
     return () => clearTimeout(timeout)
-  }, [gameId, initialMessages, sendMessage])
+  }, [gameId, initialMessages, sendMessage, session])
 
   function submit(value: string) {
     sendMessage({ text: value })

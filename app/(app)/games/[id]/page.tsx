@@ -16,6 +16,14 @@ export default async function Page(props: PageProps<"/games/[id]">) {
       key={game.id}
       gameId={game.id}
       initialMessages={game.messages}
+      session={
+        game.chatAccessToken
+          ? {
+              publicAccessToken: game.chatAccessToken,
+              lastEventId: game.chatLastEventId ?? undefined,
+            }
+          : undefined
+      }
     />
   )
 }

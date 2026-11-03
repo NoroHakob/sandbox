@@ -18,6 +18,9 @@ export const games = pgTable(
     title: text("title").notNull(),
     // Full chat thread for this game, in useChat UIMessage format
     messages: jsonb("messages").$type<UIMessage[]>().notNull().default([]),
+    // Trigger.dev chat session state, so a reload resumes the stream
+    chatAccessToken: text("chat_access_token"),
+    chatLastEventId: text("chat_last_event_id"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

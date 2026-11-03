@@ -1,0 +1,13 @@
+Migrate this app's AI chat from the Vercel AI SDK route handler (app/api/chat/route.ts) to Trigger.dev `chat.agent`.
+
+Before editing: load the trigger-authoring-chat-agent and trigger-chat-agent-advanced skills, and read https://trigger.dev/docs/ai-chat/quick-start.md, https://trigger.dev/docs/ai-chat/frontend.md and https://trigger.dev/docs/ai-chat/reference.md. Then read components/chat-thread.tsx, app/api/chat/route.ts, lib/games/queries.ts, lib/games/actions.ts and lib/db.
+
+Changes:
+- Create a `chat.agent` task with id "game-chat" in trigger/chat.ts. Move the existing streamText call into `run` UNCHANGED: same openai("gpt-6-luna") model, same instructions, same maxOutputTokens, same providerOptions (reasoningEffort). Spread `...chat.toStreamTextOptions()` as the FIRST property. `run` already receives ModelMessage[], so drop convertToModelMessages. Forward `signal` as `abortSignal`.
+- The chat id is the game id. Keep the games row as the source of truth: use a `hydrateMessages` hook that loads games.messages and uses `upsertIncomingMessage` so the opening prompt stored by createGame is not duplicated when the client replays it. Persist in `onTurnComplete`, and store `lastEventId` and the chat access token in new columns on games (chat_access_token, chat_last_event_id) in the same update. Run npm run db:push after the schema change.
+- The Trigger.dev worker has no Clerk session and must not import "server-only": split the db client so trigger code can import it (e.g. lib/db/client.ts without "server-only", lib/db/index.ts re-exports it with "server-only"), and put the worker-side read/save functions in lib/games/chat-store.ts scoped by game id only.
+- Add server actions in lib/games/chat-actions.ts: `chat.createStartSessionAction("game-chat")` wrapped with our Clerk auth + getGame ownership check, and a token mint with `auth.createPublicToken` scoped to read/write `sessions: chatId`, also behind the same check.
+- In components/chat-thread.tsx replace DefaultChatTransport with `useTriggerChatTransport` from `@trigger.dev/sdk/chat/react` wired to those actions. Keep the auto-submit effect (with its StrictMode-safe timer), the Markdown rendering and everything else in the UI. Import the agent type with `import type` only. Pass the stored access token and lastEventId from the game page so a reload resumes the stream.
+- Delete app/api/chat/route.ts.
+
+Constraints: import from @trigger.dev/sdk, @trigger.dev/sdk/ai and @trigger.dev/sdk/chat/react, never @trigger.dev/sdk/v3. Never mint tokens in the browser or expose TRIGGER_SECRET_KEY. Do not change the model, prompt or UI beyond what the transport swap requires. Do NOT add Head Start.
