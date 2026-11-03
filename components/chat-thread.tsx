@@ -1,6 +1,7 @@
 "use client"
 
 import { useChat } from "@ai-sdk/react"
+import { DefaultChatTransport, type UIMessage } from "ai"
 import Image from "next/image"
 import { useState } from "react"
 
@@ -16,8 +17,25 @@ import {
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
 
-export function ChatThread() {
-  const { messages, sendMessage, status } = useChat()
+// The server loads the stored thread, so only send the new message
+const transport = new DefaultChatTransport({
+  prepareSendMessagesRequest: ({ id, messages }) => ({
+    body: { id, message: messages.at(-1) },
+  }),
+})
+
+export function ChatThread({
+  gameId,
+  initialMessages,
+}: {
+  gameId: string
+  initialMessages: UIMessage[]
+}) {
+  const { messages, sendMessage, status } = useChat({
+    id: gameId,
+    messages: initialMessages,
+    transport,
+  })
   const [input, setInput] = useState("")
 
   function submit(value: string) {

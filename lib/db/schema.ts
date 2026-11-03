@@ -1,5 +1,13 @@
+import type { UIMessage } from "ai"
 import { desc } from "drizzle-orm"
-import { index, pgTable, text, timestamp, uuid } from "drizzle-orm/pg-core"
+import {
+  index,
+  jsonb,
+  pgTable,
+  text,
+  timestamp,
+  uuid,
+} from "drizzle-orm/pg-core"
 
 export const games = pgTable(
   "games",
@@ -8,6 +16,8 @@ export const games = pgTable(
     // Clerk organization id, not a foreign key
     orgId: text("org_id").notNull(),
     title: text("title").notNull(),
+    // Full chat thread for this game, in useChat UIMessage format
+    messages: jsonb("messages").$type<UIMessage[]>().notNull().default([]),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

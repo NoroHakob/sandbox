@@ -11,5 +11,11 @@ export default async function Page(props: PageProps<"/games/[id]">) {
   const game = await getGame(id)
   if (!game) notFound()
 
-  return <ChatThread />
+  return (
+    <ChatThread
+      key={game.id}
+      gameId={game.id}
+      initialMessages={game.messages}
+    />
+  )
 }

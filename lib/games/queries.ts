@@ -1,6 +1,7 @@
 import "server-only"
 
 import { auth } from "@clerk/nextjs/server"
+import type { UIMessage } from "ai"
 import { and, desc, eq } from "drizzle-orm"
 
 import { db, games } from "@/lib/db"
@@ -31,4 +32,21 @@ export async function getGame(id: string) {
     .limit(1)
 
   return game ?? null
+}
+
+// Called from the chat stream's onEnd, after the request scope may be gone, so
+// the caller passes the orgId it already authorized
+export async function saveGameMessages({
+  id,
+  orgId,
+  messages,
+}: {
+  id: string
+  orgId: string
+  messages: UIMessage[]
+}) {
+  await db
+    .update(games)
+    .set({ messages })
+    .where(and(eq(games.id, id), eq(games.orgId, orgId)))
 }
