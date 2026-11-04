@@ -10,7 +10,19 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable"
 
-export function GameChat(props: ComponentProps<typeof ChatThread>) {
+export function GameChat({
+  sandboxId,
+  gameId,
+  ...props
+}: ComponentProps<typeof ChatThread> & { sandboxId: string | null }) {
+  if (!sandboxId) {
+    return (
+      <div className="flex h-svh flex-col">
+        <ChatThread gameId={gameId} {...props} />
+      </div>
+    )
+  }
+
   return (
     // The group sets an inline height: 100%, which overrides a height class on
     // it, so a fixed-height parent is what keeps scrolling inside the panels
@@ -21,7 +33,7 @@ export function GameChat(props: ComponentProps<typeof ChatThread>) {
           minSize="25"
           className="flex h-full flex-col"
         >
-          <ChatThread {...props} />
+          <ChatThread gameId={gameId} {...props} />
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel
@@ -29,7 +41,7 @@ export function GameChat(props: ComponentProps<typeof ChatThread>) {
           minSize="30"
           className="flex h-full flex-col"
         >
-          <ChatPreview />
+          <ChatPreview key={gameId} gameId={gameId} />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

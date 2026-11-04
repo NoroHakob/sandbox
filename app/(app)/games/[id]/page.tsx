@@ -15,6 +15,7 @@ export default async function Page(props: PageProps<"/games/[id]">) {
     <GameChat
       key={game.id}
       gameId={game.id}
+      sandboxId={game.sandboxId}
       initialMessages={game.messages}
       session={
         game.chatAccessToken
