@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm"
 import { daytona } from "@/lib/daytona/client"
 import { db, games } from "@/lib/db/client"
 
-const GAME_DIR = "/home/daytona/game"
+export const GAME_DIR = "/home/daytona/game"
 const SERVER_LOG = "/tmp/game-server.log"
 const HEALTH_CHECK_ATTEMPTS = 20
 const HEALTH_CHECK_DELAY_MS = 250
