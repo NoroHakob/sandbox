@@ -2,8 +2,10 @@ import { openai, type OpenAILanguageModelResponsesOptions } from "@ai-sdk/openai
 import { chat, upsertIncomingMessage } from "@trigger.dev/sdk/ai"
 import { streamText } from "ai"
 
+import { createGameSandbox } from "@/lib/daytona/utils"
 import {
   getGameMessages,
+  getGameSandboxId,
   saveGameChat,
   saveGameChatAccessToken,
   saveGameMessages,
@@ -23,6 +25,9 @@ export const gameChat = chat.agent({
     }
 
     return stored
+  },
+  onChatStart: async ({ chatId }) => {
+    if (!(await getGameSandboxId(chatId))) await createGameSandbox(chatId)
   },
   // Store the token before any of the reply reaches the client, so a reload
   // mid-turn (including the first) resumes the stream instead of resending

@@ -16,6 +16,16 @@ export async function getGameMessages(id: string) {
   return game?.messages ?? null
 }
 
+export async function getGameSandboxId(id: string) {
+  const [game] = await db
+    .select({ sandboxId: games.sandboxId })
+    .from(games)
+    .where(eq(games.id, id))
+    .limit(1)
+
+  return game?.sandboxId ?? null
+}
+
 export async function saveGameMessages(id: string, messages: UIMessage[]) {
   await db.update(games).set({ messages }).where(eq(games.id, id))
 }
