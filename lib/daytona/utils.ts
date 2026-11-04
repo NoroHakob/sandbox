@@ -13,7 +13,7 @@ export const PREVIEW_PORT = 3000
 
 // Used by the Trigger.dev worker, so this imports "@/lib/db/client" directly
 export async function createGameSandbox(gameId: string) {
-  const sandbox = await daytona.create()
+  const sandbox = await daytona.create({ labels: { gameId } })
 
   await sandbox.fs.createFolder(GAME_DIR, "755")
   await sandbox.fs.uploadFile(Buffer.from("New game"), `${GAME_DIR}/index.html`)
@@ -23,7 +23,7 @@ export async function createGameSandbox(gameId: string) {
     .set({ sandboxId: sandbox.id })
     .where(eq(games.id, gameId))
 
-  return sandbox
+  return { sandbox }
 }
 
 async function ensureSandboxStarted(sandbox: Sandbox) {
@@ -37,6 +37,24 @@ async function ensureSandboxStarted(sandbox: Sandbox) {
   }
 
   await sandbox.waitUntilStarted()
+}
+
+// Older games have no sandbox yet, so one is created for them here
+export async function getGameSandbox(gameId: string) {
+  const [game] = await db
+    .select({ sandboxId: games.sandboxId })
+    .from(games)
+    .where(eq(games.id, gameId))
+    .limit(1)
+
+  if (!game) throw new Error(`Game ${gameId} not found`)
+  if (!game.sandboxId) return createGameSandbox(gameId)
+
+  const sandbox = await daytona.get(game.sandboxId)
+
+  await ensureSandboxStarted(sandbox)
+
+  return { sandbox }
 }
 
 async function isGameServerUp(sandbox: Sandbox) {
@@ -53,14 +71,14 @@ export async function startGameServer(sandboxId: string) {
 
   await ensureSandboxStarted(sandbox)
 
-  if (await isGameServerUp(sandbox)) return sandbox
+  if (await isGameServerUp(sandbox)) return { sandbox }
 
   await sandbox.process.executeCommand(
     `nohup python3 -m http.server ${PREVIEW_PORT} --directory ${GAME_DIR} >> ${SERVER_LOG} 2>&1 &`
   )
 
   for (let attempt = 0; attempt < HEALTH_CHECK_ATTEMPTS; attempt++) {
-    if (await isGameServerUp(sandbox)) return sandbox
+    if (await isGameServerUp(sandbox)) return { sandbox }
     await new Promise((resolve) => setTimeout(resolve, HEALTH_CHECK_DELAY_MS))
   }
 

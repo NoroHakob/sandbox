@@ -20,7 +20,7 @@ export async function GET(
   }
 
   try {
-    const sandbox = await startGameServer(game.sandboxId)
+    const { sandbox } = await startGameServer(game.sandboxId)
     // Signed, because an iframe can't send the x-daytona-preview-token header
     const { url } = await sandbox.getSignedPreviewUrl(
       PREVIEW_PORT,
