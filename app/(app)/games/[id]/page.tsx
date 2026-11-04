@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { notFound } from "next/navigation"
 
-import { ChatThread } from "@/components/chat-thread"
+import { GameChat } from "@/components/game-chat"
 import { getGame } from "@/lib/games/queries"
 
 export default async function Page(props: PageProps<"/games/[id]">) {
@@ -12,7 +12,7 @@ export default async function Page(props: PageProps<"/games/[id]">) {
   if (!game) notFound()
 
   return (
-    <ChatThread
+    <GameChat
       key={game.id}
       gameId={game.id}
       initialMessages={game.messages}

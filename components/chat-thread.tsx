@@ -80,7 +80,7 @@ export function ChatThread({
   const generating = status === "submitted" || status === "streaming"
 
   return (
-    <div className="flex h-svh flex-col">
+    <div className="flex h-full flex-col">
       <MessageScrollerProvider defaultScrollPosition="end">
         <MessageScroller className="flex-1">
           <MessageScrollerViewport>
