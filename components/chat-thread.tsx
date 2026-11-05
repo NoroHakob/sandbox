@@ -3,13 +3,21 @@
 import { useChat } from "@ai-sdk/react"
 import type { ChatSessionPersistedState } from "@trigger.dev/sdk/chat"
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react"
-import type { UIMessage } from "ai"
+import {
+  type DynamicToolUIPart,
+  getToolName,
+  isToolUIPart,
+  type ToolUIPart,
+  type UIMessage,
+} from "ai"
+import { CheckIcon, CircleAlertIcon } from "lucide-react"
 import Image from "next/image"
 import { useEffect, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
 import { Markdown } from "@/components/markdown"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
+import { Marker, MarkerContent, MarkerIcon } from "@/components/ui/marker"
 import { Message, MessageAvatar, MessageContent } from "@/components/ui/message"
 import {
   MessageScroller,
@@ -19,8 +27,68 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
+import { Spinner } from "@/components/ui/spinner"
 import { mintChatAccessToken, startChatSession } from "@/lib/games/chat-actions"
 import type { gameChat } from "@/trigger/chat"
+
+type ToolPart = ToolUIPart | DynamicToolUIPart
+
+const TOOL_VERBS: Record<string, { active: string; done: string }> = {
+  read_file: { active: "Reading", done: "Read" },
+  write_file: { active: "Writing", done: "Wrote" },
+  replace_text: { active: "Editing", done: "Edited" },
+  list_files: { active: "Listing files", done: "Listed files" },
+  delete_file: { active: "Deleting", done: "Deleted" },
+}
+const FALLBACK_VERBS = { active: "Working", done: "Ran tool" }
+
+function getToolStatus(part: ToolPart): {
+  status: "active" | "done" | "failed"
+  error?: string
+} {
+  switch (part.state) {
+    case "output-error":
+      return { status: "failed", error: part.errorText }
+    case "output-denied":
+      return { status: "failed", error: part.approval.reason }
+    case "output-available": {
+      // Our tools return expected problems as a result instead of throwing
+      const output = part.output as
+        { ok?: boolean; error?: string } | null | undefined
+
+      return output?.ok === false
+        ? { status: "failed", error: output.error }
+        : { status: "done" }
+    }
+    default:
+      return { status: "active" }
+  }
+}
+
+function ToolCallMarker({ part }: { part: ToolPart }) {
+  const { status, error } = getToolStatus(part)
+  const verbs = TOOL_VERBS[getToolName(part)] ?? FALLBACK_VERBS
+  // A failed call didn't happen, so it keeps the present form
+  const verb = status === "done" ? verbs.done : verbs.active
+  // Partial while the input streams, and unchecked if the input was invalid
+  const path = (part.input as { path?: unknown } | null | undefined)?.path
+
+  return (
+    <Marker
+      className={status === "failed" ? "text-destructive" : undefined}
+      title={error}
+    >
+      <MarkerIcon>
+        {status === "active" && <Spinner />}
+        {status === "done" && <CheckIcon />}
+        {status === "failed" && <CircleAlertIcon />}
+      </MarkerIcon>
+      <MarkerContent>
+        {typeof path === "string" && path ? `${verb} ${path}` : verb}
+      </MarkerContent>
+    </Marker>
+  )
+}
 
 export function ChatThread({
   gameId,
@@ -109,17 +177,27 @@ export function ChatThread({
                         }
                         align={message.role === "user" ? "end" : "start"}
                       >
-                        <BubbleContent>
-                          {message.parts.map((part, index) =>
-                            part.type !== "text" ? null : message.role ===
-                              "assistant" ? (
+                        <BubbleContent className="flex flex-col items-start gap-2">
+                          {message.parts.map((part, index) => {
+                            if (isToolUIPart(part)) {
+                              return (
+                                <ToolCallMarker
+                                  key={part.toolCallId}
+                                  part={part}
+                                />
+                              )
+                            }
+
+                            if (part.type !== "text") return null
+
+                            return message.role === "assistant" ? (
                               <Markdown key={index}>{part.text}</Markdown>
                             ) : (
                               <span key={index} className="whitespace-pre-wrap">
                                 {part.text}
                               </span>
                             )
-                          )}
+                          })}
                         </BubbleContent>
                       </Bubble>
                     </MessageContent>
