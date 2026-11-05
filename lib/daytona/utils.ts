@@ -3,6 +3,7 @@ import { eq } from "drizzle-orm"
 
 import { daytona } from "@/lib/daytona/client"
 import { db, games } from "@/lib/db/client"
+import { readRuntimeFiles } from "@/lib/games/seed"
 
 export const GAME_DIR = "/home/daytona/game"
 const SERVER_LOG = "/tmp/game-server.log"
@@ -13,10 +14,12 @@ export const PREVIEW_PORT = 3000
 
 // Used by the Trigger.dev worker, so this imports "@/lib/db/client" directly
 export async function createGameSandbox(gameId: string) {
+  const { folders, files } = await readRuntimeFiles(GAME_DIR)
   const sandbox = await daytona.create({ labels: { gameId } })
 
   await sandbox.fs.createFolder(GAME_DIR, "755")
-  await sandbox.fs.uploadFile(Buffer.from("New game"), `${GAME_DIR}/index.html`)
+  for (const folder of folders) await sandbox.fs.createFolder(folder, "755")
+  await sandbox.fs.uploadFiles(files)
 
   await db
     .update(games)

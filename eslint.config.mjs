@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Seeded into sandboxes as is, not part of this app
+    "lib/games/runtime/**",
   ]),
 ]);
 
