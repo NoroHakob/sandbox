@@ -2,12 +2,8 @@ html,
 body {
   height: 100%;
   margin: 0;
-}
-
-body {
-  display: grid;
-  place-items: center;
-  background: #0a0a0a;
-  color: #a3a3a3;
+  overflow: hidden;
+  background: #0a0402;
+  color: #fff;
   font-family: system-ui, sans-serif;
 }

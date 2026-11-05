@@ -12,6 +12,7 @@ import { z } from "zod"
 import { GAME_DIR, getGameSandbox } from "@/lib/daytona/utils"
 
 const ENTRY_FILE = `${GAME_DIR}/index.html`
+const ENGINE_DIR = `${GAME_DIR}/engine`
 const MAX_READ_BYTES = 128 * 1024
 const MAX_LIST_DEPTH = 10
 const SAFE_PATH = /^[a-zA-Z0-9._/-]+$/
@@ -52,6 +53,18 @@ function resolveGamePath(path: string) {
 
   if (resolved !== GAME_DIR && !resolved.startsWith(`${GAME_DIR}/`)) {
     throw new ToolProblem(`Invalid path "${path}": outside the game folder`)
+  }
+
+  return resolved
+}
+
+function resolveWritablePath(path: string) {
+  const resolved = resolveGamePath(path)
+
+  if (resolved === ENGINE_DIR || resolved.startsWith(`${ENGINE_DIR}/`)) {
+    throw new ToolProblem(
+      `Cannot change "${path}": engine/ is read-only. Import it from "./engine/index.js" and put your changes in the game's own files`
+    )
   }
 
   return resolved
@@ -142,7 +155,7 @@ export function createGameTools(gameId: string) {
       }),
       execute: ({ path, content }) =>
         run(async (sandbox) => {
-          const file = resolveGamePath(path)
+          const file = resolveWritablePath(path)
           const data = Buffer.from(content, "utf8")
 
           await sandbox.fs.createFolder(posix.dirname(file), "755")
@@ -166,7 +179,7 @@ export function createGameTools(gameId: string) {
       }),
       execute: ({ path, old_text, new_text, replace_all = false }) =>
         run(async (sandbox) => {
-          const file = resolveGamePath(path)
+          const file = resolveWritablePath(path)
 
           if (!old_text) throw new ToolProblem("old_text must not be empty")
 
@@ -199,7 +212,7 @@ export function createGameTools(gameId: string) {
       inputSchema: z.object({ path: pathSchema }),
       execute: ({ path }) =>
         run(async (sandbox) => {
-          const file = resolveGamePath(path)
+          const file = resolveWritablePath(path)
 
           if (file === ENTRY_FILE) {
             throw new ToolProblem("index.html cannot be deleted")
