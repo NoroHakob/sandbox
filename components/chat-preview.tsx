@@ -4,13 +4,30 @@ import { useEffect, useState } from "react"
 
 import { Spinner } from "@/components/ui/spinner"
 
-export function ChatPreview({ gameId }: { gameId: string }) {
-  const [url, setUrl] = useState<string | null>(null)
+export function ChatPreview({
+  gameId,
+  ready,
+  revision,
+}: {
+  gameId: string
+  // A new game has no sandbox until its first turn has started
+  ready: boolean
+  // Bumped after each turn, to show the files the turn changed
+  revision: number
+}) {
+  const [preview, setPreview] = useState<{
+    url: string
+    revision: number
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!ready) return
+
     const controller = new AbortController()
 
+    // Always fetched again, as the sandbox may have stopped and the signed URL
+    // expires, while the current game stays on screen until the new one is set
     async function loadPreview() {
       try {
         const response = await fetch(`/api/games/${gameId}/preview`, {
@@ -19,7 +36,8 @@ export function ChatPreview({ gameId }: { gameId: string }) {
         const body = await response.json()
         if (!response.ok) throw new Error(body.error)
 
-        setUrl(body.url)
+        setPreview({ url: body.url, revision })
+        setError(null)
       } catch (err) {
         if (controller.signal.aborted) return
         setError(err instanceof Error ? err.message : "Failed to load preview")
@@ -29,10 +47,18 @@ export function ChatPreview({ gameId }: { gameId: string }) {
     loadPreview()
 
     return () => controller.abort()
-  }, [gameId])
+  }, [gameId, ready, revision])
 
-  if (url) {
-    return <iframe src={url} title="Game preview" className="size-full" />
+  if (preview) {
+    return (
+      <iframe
+        // The URL can be unchanged, so the key is what forces the reload
+        key={preview.revision}
+        src={preview.url}
+        title="Game preview"
+        className="size-full"
+      />
+    )
   }
 
   return (
@@ -40,7 +66,7 @@ export function ChatPreview({ gameId }: { gameId: string }) {
       {error ?? (
         <>
           <Spinner />
-          Starting preview…
+          {ready ? "Starting preview…" : "Building your game…"}
         </>
       )}
     </div>

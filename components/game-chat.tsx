@@ -1,6 +1,6 @@
 "use client"
 
-import type { ComponentProps } from "react"
+import { type ComponentProps, useState } from "react"
 
 import { ChatPreview } from "@/components/chat-preview"
 import { ChatThread } from "@/components/chat-thread"
@@ -14,14 +14,10 @@ export function GameChat({
   sandboxId,
   gameId,
   ...props
-}: ComponentProps<typeof ChatThread> & { sandboxId: string | null }) {
-  if (!sandboxId) {
-    return (
-      <div className="flex h-svh flex-col">
-        <ChatThread gameId={gameId} {...props} />
-      </div>
-    )
-  }
+}: Omit<ComponentProps<typeof ChatThread>, "onTurnFinish"> & {
+  sandboxId: string | null
+}) {
+  const [revision, setRevision] = useState(0)
 
   return (
     // The group sets an inline height: 100%, which overrides a height class on
@@ -33,7 +29,11 @@ export function GameChat({
           minSize="25"
           className="flex h-full flex-col"
         >
-          <ChatThread gameId={gameId} {...props} />
+          <ChatThread
+            gameId={gameId}
+            onTurnFinish={() => setRevision((current) => current + 1)}
+            {...props}
+          />
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel
@@ -41,7 +41,13 @@ export function GameChat({
           minSize="30"
           className="flex h-full flex-col"
         >
-          <ChatPreview key={gameId} gameId={gameId} />
+          <ChatPreview
+            key={gameId}
+            gameId={gameId}
+            // The page's sandboxId is stale once the first turn has created one
+            ready={!!sandboxId || revision > 0}
+            revision={revision}
+          />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

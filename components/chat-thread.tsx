@@ -26,11 +26,13 @@ export function ChatThread({
   gameId,
   initialMessages,
   session,
+  onTurnFinish,
 }: {
   gameId: string
   initialMessages: UIMessage[]
   // Stored after each turn, so a reload resumes the stream
   session?: ChatSessionPersistedState
+  onTurnFinish?: () => void
 }) {
   const transport = useTriggerChatTransport<typeof gameChat>({
     task: "game-chat",
@@ -43,6 +45,7 @@ export function ChatThread({
     messages: initialMessages,
     transport,
     resume: !!session,
+    onFinish: () => onTurnFinish?.(),
   })
   const [input, setInput] = useState("")
 
