@@ -1,6 +1,6 @@
 import { openai, type OpenAILanguageModelResponsesOptions } from "@ai-sdk/openai"
 import { chat, upsertIncomingMessage } from "@trigger.dev/sdk/ai"
-import { streamText } from "ai"
+import { stepCountIs, streamText } from "ai"
 
 import { createGameSandbox } from "@/lib/daytona/utils"
 import {
@@ -11,10 +11,12 @@ import {
   saveGameMessages,
 } from "@/lib/games/chat-store"
 import { gameInstructions } from "@/lib/games/instructions"
+import { createGameTools } from "@/lib/games/tools"
 
 // The chat id is the game id, and the games row is the source of truth
 export const gameChat = chat.agent({
   id: "game-chat",
+  tools: ({ chatId }) => createGameTools(chatId),
   hydrateMessages: async ({ chatId, trigger, incomingMessages }) => {
     const stored = await getGameMessages(chatId)
     if (!stored) throw new Error(`Game ${chatId} not found`)
@@ -48,14 +50,16 @@ export const gameChat = chat.agent({
       chatLastEventId: lastEventId,
     })
   },
-  run: async ({ messages, signal }) =>
+  run: async ({ messages, tools, signal }) =>
     streamText({
-      ...chat.toStreamTextOptions(),
+      ...chat.toStreamTextOptions({ tools }),
       model: openai("gpt-6-luna"),
       instructions: gameInstructions,
       messages,
       abortSignal: signal,
-      maxOutputTokens: 3000,
+      stopWhen: stepCountIs(40),
+      // A whole game file must fit in one write_file call
+      maxOutputTokens: 16000,
       providerOptions: {
         openai: {
           reasoningEffort: "low",
