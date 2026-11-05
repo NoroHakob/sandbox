@@ -1,18 +1,21 @@
 "use client"
 
 import { useChat } from "@ai-sdk/react"
+import type { InferChatUIMessageFromTools } from "@trigger.dev/sdk/ai"
 import type { ChatSessionPersistedState } from "@trigger.dev/sdk/chat"
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react"
 import {
   type DynamicToolUIPart,
   getToolName,
+  type InferUITools,
   isToolUIPart,
+  lastAssistantMessageIsCompleteWithToolCalls,
   type ToolUIPart,
   type UIMessage,
 } from "ai"
 import { CheckIcon, CircleAlertIcon } from "lucide-react"
 import Image from "next/image"
-import { useEffect, useRef, useState } from "react"
+import { type FormEvent, useEffect, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
 import { Markdown } from "@/components/markdown"
@@ -27,10 +30,25 @@ import {
   MessageScrollerProvider,
   MessageScrollerViewport,
 } from "@/components/ui/message-scroller"
+import {
+  Questionnaire,
+  QuestionnaireActions,
+  QuestionnaireChoice,
+  QuestionnaireChoiceDescription,
+  QuestionnaireChoices,
+  QuestionnaireError,
+  QuestionnaireItem,
+  QuestionnaireSubmit,
+  QuestionnaireTitle,
+} from "@/components/ui/questionnaire"
 import { Spinner } from "@/components/ui/spinner"
 import { mintChatAccessToken, startChatSession } from "@/lib/games/chat-actions"
+import type { createGameTools } from "@/lib/games/tools"
 import type { gameChat } from "@/trigger/chat"
 
+type GameTools = ReturnType<typeof createGameTools>
+type GameMessage = InferChatUIMessageFromTools<GameTools>
+type AskPlayer = InferUITools<GameTools>["ask_player"]
 type ToolPart = ToolUIPart | DynamicToolUIPart
 
 const TOOL_VERBS: Record<string, { active: string; done: string }> = {
@@ -39,6 +57,7 @@ const TOOL_VERBS: Record<string, { active: string; done: string }> = {
   replace_text: { active: "Editing", done: "Edited" },
   list_files: { active: "Listing files", done: "Listed files" },
   delete_file: { active: "Deleting", done: "Deleted" },
+  ask_player: { active: "Asking", done: "Asked" },
 }
 const FALLBACK_VERBS = { active: "Working", done: "Ran tool" }
 
@@ -90,6 +109,85 @@ function ToolCallMarker({ part }: { part: ToolPart }) {
   )
 }
 
+function AskPlayerQuestion({
+  input,
+  disabled,
+  onAnswer,
+}: {
+  input: AskPlayer["input"]
+  disabled: boolean
+  onAnswer: (output: AskPlayer["output"]) => void
+}) {
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    // Enter submits past the disabled button, and an answer given mid-stream
+    // would never be sent, as useChat only auto-sends when idle
+    if (disabled) return
+
+    const optionId = new FormData(event.currentTarget).get("answer")
+    const option = input.options.find(({ id }) => id === optionId)
+
+    if (option) onAnswer({ optionId: option.id, label: option.label })
+  }
+
+  return (
+    <Questionnaire onSubmit={submit} className="rounded-lg border p-4">
+      <QuestionnaireItem name="answer" required>
+        <QuestionnaireTitle>{input.question}</QuestionnaireTitle>
+        <QuestionnaireChoices>
+          {input.options.map((option) => (
+            <QuestionnaireChoice key={option.id} value={option.id}>
+              {option.label}
+              <QuestionnaireChoiceDescription>
+                {option.description}
+              </QuestionnaireChoiceDescription>
+            </QuestionnaireChoice>
+          ))}
+        </QuestionnaireChoices>
+        <QuestionnaireError />
+      </QuestionnaireItem>
+      <QuestionnaireActions>
+        <QuestionnaireSubmit disabled={disabled}>
+          Build this
+        </QuestionnaireSubmit>
+      </QuestionnaireActions>
+    </Questionnaire>
+  )
+}
+
+function AskPlayerAnswer({
+  question,
+  answer,
+}: {
+  question: string
+  answer: string
+}) {
+  return (
+    <div className="flex w-full flex-col gap-1 rounded-lg border p-4 text-sm">
+      <p className="text-muted-foreground">{question}</p>
+      <p className="font-medium">{answer}</p>
+    </div>
+  )
+}
+
+// The helper alone also matches a turn that ended on a server tool step, such
+// as one cut off by the step limit, which would start a new turn by itself
+function isAskPlayerAnswered({ messages }: { messages: GameMessage[] }) {
+  if (!lastAssistantMessageIsCompleteWithToolCalls({ messages })) return false
+
+  const parts = messages.at(-1)?.parts ?? []
+  const lastStepStart = parts.findLastIndex(
+    (part) => part.type === "step-start"
+  )
+
+  return parts
+    .slice(lastStepStart + 1)
+    .some(
+      (part) =>
+        part.type === "tool-ask_player" && part.state === "output-available"
+    )
+}
+
 export function ChatThread({
   gameId,
   initialMessages,
@@ -108,13 +206,16 @@ export function ChatThread({
     startSession: ({ chatId }) => startChatSession({ chatId }),
     sessions: session && { [gameId]: session },
   })
-  const { messages, sendMessage, stop, status } = useChat({
-    id: gameId,
-    messages: initialMessages,
-    transport,
-    resume: !!session,
-    onFinish: () => onTurnFinish?.(),
-  })
+  const { messages, sendMessage, addToolOutput, stop, status } =
+    useChat<GameMessage>({
+      id: gameId,
+      // Stored as plain UIMessages, with the shape the tools produced
+      messages: initialMessages as GameMessage[],
+      transport,
+      resume: !!session,
+      sendAutomaticallyWhen: isAskPlayerAnswered,
+      onFinish: () => onTurnFinish?.(),
+    })
   const [input, setInput] = useState("")
 
   // A new game is stored with only the prompt, so request the reply once
@@ -149,6 +250,13 @@ export function ChatThread({
   }
 
   const generating = status === "submitted" || status === "streaming"
+  // Recomputed from the parts, so parallel questions get answered in turn
+  const pendingQuestion = messages
+    .at(-1)
+    ?.parts.findLast(
+      (part) =>
+        part.type === "tool-ask_player" && part.state === "input-available"
+    )
 
   return (
     <div className="flex h-full flex-col">
@@ -180,6 +288,40 @@ export function ChatThread({
                         <BubbleContent className="flex flex-col items-start gap-2">
                           {message.parts.map((part, index) => {
                             if (isToolUIPart(part)) {
+                              if (
+                                part.type === "tool-ask_player" &&
+                                part.state === "output-available"
+                              ) {
+                                return (
+                                  <AskPlayerAnswer
+                                    key={part.toolCallId}
+                                    question={part.input.question}
+                                    answer={part.output.label}
+                                  />
+                                )
+                              }
+
+                              if (
+                                part.type === "tool-ask_player" &&
+                                part.state === "input-available" &&
+                                part === pendingQuestion
+                              ) {
+                                return (
+                                  <AskPlayerQuestion
+                                    key={part.toolCallId}
+                                    input={part.input}
+                                    disabled={generating}
+                                    onAnswer={(output) =>
+                                      addToolOutput({
+                                        tool: "ask_player",
+                                        toolCallId: part.toolCallId,
+                                        output,
+                                      })
+                                    }
+                                  />
+                                )
+                              }
+
                               return (
                                 <ToolCallMarker
                                   key={part.toolCallId}
@@ -214,7 +356,7 @@ export function ChatThread({
           value={input}
           onValueChange={setInput}
           onSubmit={submit}
-          disabled={generating}
+          disabled={generating || !!pendingQuestion}
           onStop={generating ? cancel : undefined}
           placeholder="Ask for a change…"
         />

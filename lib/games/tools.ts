@@ -70,6 +70,41 @@ function resolveWritablePath(path: string) {
   return resolved
 }
 
+// No execute: the player answers in the UI, which supplies the output
+const askPlayer = tool({
+  description:
+    "Ask the player one design question and wait for their answer. Ask a single question per call. Use this mainly on the opening turn, to settle what the game is before writing code.",
+  inputSchema: z.object({
+    dimension: z
+      .union([
+        z.literal("loop").describe("What the player does over and over"),
+        z.literal("goal").describe("What the player is trying to achieve"),
+        z.literal("challenge").describe("What stands in the player's way"),
+        z.literal("controls").describe("How the player acts on the game"),
+        z.literal("world").describe("Where the game takes place"),
+        z.literal("look").describe("How the game appears"),
+        z.literal("feel").describe("The mood and pace of playing"),
+      ])
+      .describe("The part of the game this question settles"),
+    question: z.string().describe("The question to show the player"),
+    options: z
+      .array(
+        z.object({
+          id: z.string().describe("Short lowercase id, unique among options"),
+          label: z.string().describe("A few words, like a button"),
+          description: z.string().describe("One sentence on this option"),
+        })
+      )
+      .min(2)
+      .max(4)
+      .describe("The answers the player can choose from"),
+  }),
+  outputSchema: z.object({
+    optionId: z.string().describe("The id of the chosen option"),
+    label: z.string().describe("The label of the chosen option"),
+  }),
+})
+
 // Called once per turn, so the sandbox and the queue last for a single turn
 export function createGameTools(gameId: string) {
   let sandboxPromise: Promise<Sandbox> | undefined
@@ -109,6 +144,8 @@ export function createGameTools(gameId: string) {
   }
 
   return {
+    ask_player: askPlayer,
+
     list_files: tool({
       description:
         "List the files and folders of the game, including nested ones.",
