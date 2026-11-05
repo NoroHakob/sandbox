@@ -1,8 +1,11 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import { Spinner } from "@/components/ui/spinner"
+
+// The preview route signs URLs for 60 minutes
+const URL_MAX_AGE_MS = 50 * 60 * 1000
 
 export function ChatPreview({
   gameId,
@@ -20,14 +23,17 @@ export function ChatPreview({
     revision: number
   } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  // Cleared when a load fails, so the next revision fetches a new URL
+  const signedUrl = useRef<{ url: string; fetchedAt: number } | null>(null)
 
   useEffect(() => {
     if (!ready) return
 
     const controller = new AbortController()
 
-    // Always fetched again, as the sandbox may have stopped and the signed URL
-    // expires, while the current game stays on screen until the new one is set
+    // Always requested, as the route restarts the server after an auto-stop.
+    // The game stays on screen meanwhile, and its URL is reused while it's
+    // valid, which keeps the origin and with it the game's localStorage
     async function loadPreview() {
       try {
         const response = await fetch(`/api/games/${gameId}/preview`, {
@@ -36,10 +42,18 @@ export function ChatPreview({
         const body = await response.json()
         if (!response.ok) throw new Error(body.error)
 
-        setPreview({ url: body.url, revision })
+        const stored = signedUrl.current
+        const current =
+          stored && Date.now() - stored.fetchedAt < URL_MAX_AGE_MS
+            ? stored
+            : { url: body.url as string, fetchedAt: Date.now() }
+
+        signedUrl.current = current
+        setPreview({ url: current.url, revision })
         setError(null)
       } catch (err) {
         if (controller.signal.aborted) return
+        signedUrl.current = null
         setError(err instanceof Error ? err.message : "Failed to load preview")
       }
     }
@@ -52,7 +66,7 @@ export function ChatPreview({
   if (preview) {
     return (
       <iframe
-        // The URL can be unchanged, so the key is what forces the reload
+        // The URL is usually unchanged, so the key is what forces the reload
         key={preview.revision}
         src={preview.url}
         title="Game preview"
