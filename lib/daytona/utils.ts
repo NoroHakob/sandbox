@@ -6,6 +6,7 @@ import { db, games } from "@/lib/db/client"
 import { readRuntimeFiles } from "@/lib/games/seed"
 
 export const GAME_DIR = "/home/daytona/game"
+export const ENGINE_DIR = `${GAME_DIR}/engine`
 const SERVER_LOG = "/tmp/game-server.log"
 const HEALTH_CHECK_ATTEMPTS = 20
 const HEALTH_CHECK_DELAY_MS = 250
@@ -42,7 +43,23 @@ async function ensureSandboxStarted(sandbox: Sandbox) {
   await sandbox.waitUntilStarted()
 }
 
-// Older games have no sandbox yet, so one is created for them here
+// A sandbox keeps the engine it was created with, which the instructions may
+// have moved past. Only engine/ is copied: the rest belongs to the game
+async function syncEngine(sandbox: Sandbox) {
+  const { folders, files } = await readRuntimeFiles(GAME_DIR)
+  const isEngine = (path: string) =>
+    path === ENGINE_DIR || path.startsWith(`${ENGINE_DIR}/`)
+
+  for (const folder of folders.filter(isEngine)) {
+    await sandbox.fs.createFolder(folder, "755")
+  }
+  await sandbox.fs.uploadFiles(
+    files.filter(({ destination }) => isEngine(destination))
+  )
+}
+
+// Older games have no sandbox yet, so one is created for them here. Called once
+// per turn, as createGameTools caches the result
 export async function getGameSandbox(gameId: string) {
   const [game] = await db
     .select({ sandboxId: games.sandboxId })
@@ -56,6 +73,7 @@ export async function getGameSandbox(gameId: string) {
   const sandbox = await daytona.get(game.sandboxId)
 
   await ensureSandboxStarted(sandbox)
+  await syncEngine(sandbox)
 
   return { sandbox }
 }

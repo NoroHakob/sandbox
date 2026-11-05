@@ -9,10 +9,9 @@ import {
 import { tool } from "ai"
 import { z } from "zod"
 
-import { GAME_DIR, getGameSandbox } from "@/lib/daytona/utils"
+import { ENGINE_DIR, GAME_DIR, getGameSandbox } from "@/lib/daytona/utils"
 
 const ENTRY_FILE = `${GAME_DIR}/index.html`
-const ENGINE_DIR = `${GAME_DIR}/engine`
 const MAX_READ_BYTES = 128 * 1024
 const MAX_LIST_DEPTH = 10
 const SAFE_PATH = /^[a-zA-Z0-9._/-]+$/

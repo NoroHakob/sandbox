@@ -23,7 +23,9 @@ function startLevel() {
 hud.startScreen({ title: "My Game", text: "WASD to move, Space to jump", onStart: startLevel })
 
 Always open with hud.startScreen: its click gives the page keyboard focus and unlocks audio. Keep hud.pauseMenu() and input.touchControls() so the game pauses and works on phones.
-Game over: game.pause(), then hud.gameOverScreen({ score, onRestart: () => { game.resume(); startLevel() } }).
+Every game needs a pause menu, which has Resume and Sound built in. With restart doing game.resume(); startLevel(), and quit doing game.resume(); game.clear(); hud.clear() and showing the start screen: hud.pauseMenu({ extraButtons: [{ label: "Restart", onClick: restart }, { label: "Quit to title", onClick: quit }] }).
+Every game also needs these corner buttons and the M key, once at the top. Muting is remembered: hud.button("pause", { label: "⏸", title: "Pause", onClick: hud.openPauseMenu }); hud.button("sound", { label: () => (sound.muted ? "🔇" : "🔊"), title: "Sound", onClick: sound.toggleMute }); input.bind({ mute: ["KeyM"] }); game.onFrame(() => { if (input.pressed("mute")) sound.toggleMute() }).
+Game over: game.pause(), then hud.gameOverScreen({ score, onRestart: restart, extraButtons: [{ label: "Quit to title", onClick: quit }] }).
 
 createGame({ lights: preset name or false, camera: { type: "perspective"|"orthographic", fov, size, position, lookAt }, shadows, bloom: true|{ strength, radius, threshold }, vignette: true|number, gravity: -30, background, exposure, maxPixelRatio })
 game fields: scene, camera, renderer, canvas, world, physics, input, hud, sound, time, dt, timeScale, paused, stateName, lights
@@ -83,10 +85,11 @@ floatText(game, pos, "+10", { color, size }) | screenFlash(game, { color, durati
 
 hud: stat(id, { label, value, slot, format }) bar(id, { label, value, max, slot, color }) hearts(id, { max, value, slot }) each returns { set(value), remove() }. hud.set(id, value), hud.get(id), hud.remove(id)
 slots: top-left top-center top-right bottom-left bottom-center bottom-right
+button(id, { label, title, onClick, slot }) corner button that stays through hud.clear(), label can be a function that is read every frame
 toast(text) banner(text, { sub, duration }) crosshair() minimap({ center, layers: [{ tag, color }], range }) anchor(target, { text, bar: 0..1, height }) returns { setText, setBar, remove }
 await dialog(["line", ...], { speaker })
-screen({ title, subtitle, text, rows: [[label, value]], buttons: [{ label, onClick }], dim, passive, align }) returns { close() }
-startScreen({ title, subtitle, text, button, onStart }) gameOverScreen({ title, score, bestKey, rows, button, onRestart }) saves the best score. pauseMenu() once for Esc/P. theme({ accent, text, panel, font }) clear()
+screen({ title, subtitle, text, rows: [[label, value]], buttons: [{ label, onClick, keepOpen }], dim, passive, align }) returns { close() }
+startScreen({ title, subtitle, text, button, onStart }) gameOverScreen({ title, score, bestKey, rows, button, onRestart, extraButtons }) saves the best score. pauseMenu({ title, text, extraButtons }) once for Esc/P | openPauseMenu(). theme({ accent, text, panel, font }) clear()
 
 sound: play(name, { pitch }): click select jump land step coin pickup powerup shoot laser hit hurt explosion dash bounce win lose
 music(style, { seed, bpm }): arcade adventure calm tense action space | stopMusic() | drone({ wave, frequency, volume }) returns { set(hz, volume), stop() } | tone({ wave, from, to, duration, volume }) noise({ duration, from, to, volume }) | setVolume setMusicVolume toggleMute
