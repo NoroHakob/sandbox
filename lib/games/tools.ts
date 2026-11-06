@@ -9,7 +9,12 @@ import {
 import { tool } from "ai"
 import { z } from "zod"
 
-import { ENGINE_DIR, GAME_DIR, getGameSandbox } from "@/lib/daytona/utils"
+import {
+  ENGINE_DIR,
+  GAME_DIR,
+  getGameSandbox,
+  REPORT_FILE,
+} from "@/lib/daytona/utils"
 
 const ENTRY_FILE = `${GAME_DIR}/index.html`
 const MAX_READ_BYTES = 128 * 1024
@@ -63,6 +68,12 @@ function resolveWritablePath(path: string) {
   if (resolved === ENGINE_DIR || resolved.startsWith(`${ENGINE_DIR}/`)) {
     throw new ToolProblem(
       `Cannot change "${path}": engine/ is read-only. Import it from "./engine/index.js" and put your changes in the game's own files`
+    )
+  }
+
+  if (resolved === REPORT_FILE) {
+    throw new ToolProblem(
+      `Cannot change "${path}": it reports the game's errors to the app and is read-only`
     )
   }
 

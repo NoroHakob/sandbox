@@ -7,6 +7,7 @@ import { readRuntimeFiles } from "@/lib/games/seed"
 
 export const GAME_DIR = "/home/daytona/game"
 export const ENGINE_DIR = `${GAME_DIR}/engine`
+export const REPORT_FILE = `${GAME_DIR}/report.js`
 const SERVER_LOG = "/tmp/game-server.log"
 const HEALTH_CHECK_ATTEMPTS = 20
 const HEALTH_CHECK_DELAY_MS = 250
@@ -44,7 +45,8 @@ async function ensureSandboxStarted(sandbox: Sandbox) {
 }
 
 // A sandbox keeps the engine it was created with, which the instructions may
-// have moved past. Only engine/ is copied: the rest belongs to the game
+// have moved past. Only engine/ and report.js are copied: the rest belongs to
+// the game
 async function syncEngine(sandbox: Sandbox) {
   const { folders, files } = await readRuntimeFiles(GAME_DIR)
   const isEngine = (path: string) =>
@@ -54,7 +56,9 @@ async function syncEngine(sandbox: Sandbox) {
     await sandbox.fs.createFolder(folder, "755")
   }
   await sandbox.fs.uploadFiles(
-    files.filter(({ destination }) => isEngine(destination))
+    files.filter(
+      ({ destination }) => isEngine(destination) || destination === REPORT_FILE
+    )
   )
 }
 
