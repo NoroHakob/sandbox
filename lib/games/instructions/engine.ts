@@ -1,5 +1,8 @@
 export const engine = `Engine API. Import from "./engine/index.js" (path relative to index.html):
-import { createGame, THREE, models, materials, textures, lights, effects, anim, controls, ai, levels, math, storage } from "./engine/index.js"
+import { createGame, disposeObject, PhysicsWorld, THREE, models, materials, textures, lights, effects, anim, controls, ai, levels, math, storage } from "./engine/index.js"
+Those are all the exports. hud, input and sound are not exports, so never import them: they belong to a game, so get them with const { hud, input, sound } = game. The sections below named hud, Input and sound describe those objects.
+If you are unsure of an export, read engine/index.js with read_file before importing it.
+createGame makes the PhysicsWorld at game.physics, so you rarely need the class. disposeObject(object) frees an object's GPU resources, and game.remove already calls it.
 
 Conventions: Y is up, models face +Z with their origin at the base. Colors are hex numbers. Helpers that run over time take game first and return { stop() } or a state object. Read input only in update functions.
 
@@ -68,8 +71,8 @@ ground({ size, tint, material }) water({ size, level, tint }) terrain({ size, se
 models.instanced(model, count, (dummy, i) => dummy.position.set(...)) | models.scatter(model, { count, area, seed, heightAt, scale: [min, max], keepOut: (x, z) => bool }). Use these for more than 20 copies. Not for rigged models.
 Compose: group several models in a THREE.Group, or recolor with options. Build custom shapes with THREE and materials.lowPoly(color).
 
-materials.*: standard lowPoly toon metal glass unlit (color, options) | glow(color, intensity) feeds bloom | textured(kind, { repeat }, materialOptions) | water(color) lava() energy(color) animate themselves. They are shared, so clone() one before changing it.
-textures.*: checker grid stripes noise grass sand stone lava brick planks plates ({ repeat, ...colors }) gradient([top, bottom]) label(text)
+materials.*: standard lowPoly toon metal glass unlit (color, options) | glow(color, intensity) feeds bloom | textured(kind, { repeat }, materialOptions) | water(color) lava() energy(color) animate themselves. They are shared, so clone() one before changing it. painted() is the vertex-color material the models use. tick(dt) is called by the game loop, so never call it.
+textures.*: checker grid stripes noise grass sand stone lava brick planks plates ({ repeat, ...colors }) gradient([top, bottom]) label(text) ripples() is the grey height map behind materials.water
 lights: preset(game, "daylight"|"sunset"|"night"|"studio"|"dungeon"|"neon", { area, fog: [near, far]|false, env: true, sky }) | sky(game, [top, mid, bottom]) | sun(game, { color, intensity, position, area }) | point(color, intensity, distance) add it yourself | environment(game, intensity) makes metal reflect | followShadow(game, game.lights.sun, target) for levels wider than area
 
 anim: tween(game, target, { y: 2, color: 0xff0000 }, { duration, ease, delay, repeat, yoyo, onUpdate, onComplete }) is awaitable; nest vectors with { position: [x, y, z] }
