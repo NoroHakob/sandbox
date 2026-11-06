@@ -1,11 +1,14 @@
 import * as Sentry from "@sentry/node"
 import { tasks } from "@trigger.dev/sdk"
 
+import { scrubErrorEvent } from "@/lib/observability"
+
 Sentry.init({
   dsn: process.env.SENTRY_DSN,
   // Trigger.dev owns OpenTelemetry inside runs
   defaultIntegrations: false,
   environment: process.env.SENTRY_ENVIRONMENT ?? process.env.NODE_ENV,
+  beforeSend: scrubErrorEvent,
 })
 
 // Runs once a run has exhausted its retries. The hook's payload is deliberately

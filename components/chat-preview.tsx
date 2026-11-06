@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react"
 import { z } from "zod"
 
 import { Spinner } from "@/components/ui/spinner"
+import { describeError } from "@/lib/observability"
 
 // The preview route signs URLs for 60 minutes
 const URL_MAX_AGE_MS = 50 * 60 * 1000
@@ -132,6 +133,10 @@ export function ChatPreview({
       } catch (err) {
         if (controller.signal.aborted) return
         signedUrl.current = null
+        Sentry.logger.error("Failed to load game preview", {
+          "game.id": gameId,
+          ...describeError(err),
+        })
         setError(err instanceof Error ? err.message : "Failed to load preview")
       }
     }

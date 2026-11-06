@@ -1,10 +1,12 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
+import { logger } from "@sentry/nextjs"
 import { auth as triggerAuth } from "@trigger.dev/sdk"
 import { chat } from "@trigger.dev/sdk/ai"
 
 import { getGame } from "@/lib/games/queries"
+import { describeError } from "@/lib/observability"
 import type { gameChat } from "@/trigger/chat"
 
 const startSession = chat.createStartSessionAction<typeof gameChat>("game-chat")
@@ -12,25 +14,54 @@ const startSession = chat.createStartSessionAction<typeof gameChat>("game-chat")
 // The chat id is the game id, so owning the game authorizes the chat
 async function requireGame(chatId: string) {
   const { userId } = await auth()
-  if (!userId) throw new Error("Unauthorized")
+  if (!userId) {
+    logger.warn(logger.fmt`Unauthorized chat access to game ${chatId}`, {
+      "game.id": chatId,
+    })
+    throw new Error("Unauthorized")
+  }
 
   const game = await getGame(chatId)
-  if (!game) throw new Error("Not found")
+  if (!game) {
+    // Also what a game of another organization looks like
+    logger.warn(logger.fmt`Chat access to unavailable game ${chatId}`, {
+      "game.id": chatId,
+    })
+    throw new Error("Not found")
+  }
 }
 
 export async function startChatSession({ chatId }: { chatId: string }) {
   await requireGame(chatId)
-  return startSession({ chatId })
+
+  try {
+    return await startSession({ chatId })
+  } catch (error) {
+    logger.error(logger.fmt`Failed to start chat session for game ${chatId}`, {
+      "game.id": chatId,
+      ...describeError(error),
+    })
+    throw error
+  }
 }
 
 // The transport calls this on 401/403 to refresh the session token
 export async function mintChatAccessToken(chatId: string) {
   await requireGame(chatId)
-  return triggerAuth.createPublicToken({
-    scopes: {
-      read: { sessions: chatId },
-      write: { sessions: chatId },
-    },
-    expirationTime: "1h",
-  })
+
+  try {
+    return await triggerAuth.createPublicToken({
+      scopes: {
+        read: { sessions: chatId },
+        write: { sessions: chatId },
+      },
+      expirationTime: "1h",
+    })
+  } catch (error) {
+    logger.error(logger.fmt`Failed to mint chat token for game ${chatId}`, {
+      "game.id": chatId,
+      ...describeError(error),
+    })
+    throw error
+  }
 }

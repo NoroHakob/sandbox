@@ -1,4 +1,7 @@
-import { openai, type OpenAILanguageModelResponsesOptions } from "@ai-sdk/openai"
+import {
+  openai,
+  type OpenAILanguageModelResponsesOptions,
+} from "@ai-sdk/openai"
 import { chat, upsertIncomingMessage } from "@trigger.dev/sdk/ai"
 import { stepCountIs, streamText } from "ai"
 
@@ -12,14 +15,24 @@ import {
 } from "@/lib/games/chat-store"
 import { gameInstructions } from "@/lib/games/instructions"
 import { createGameTools } from "@/lib/games/tools"
+import { describeError, elapsed, logger } from "@/lib/observability"
 
 // The chat id is the game id, and the games row is the source of truth
 export const gameChat = chat.agent({
   id: "game-chat",
   tools: ({ chatId }) => createGameTools(chatId),
-  hydrateMessages: async ({ chatId, trigger, incomingMessages }) => {
+  hydrateMessages: async ({ chatId, turn, trigger, incomingMessages }) => {
     const stored = await getGameMessages(chatId)
     if (!stored) throw new Error(`Game ${chatId} not found`)
+
+    // Before the upsert below, which appends to stored
+    logger.info(logger.fmt`Turn ${turn} started for game ${chatId}`, {
+      "game.id": chatId,
+      "chat.turn": turn,
+      "chat.trigger": trigger,
+      "chat.stored_messages": stored.length,
+      "chat.incoming_messages": incomingMessages.length,
+    })
 
     // createGame stores the opening prompt and the client replays it to
     // request the first reply, so only append messages the thread lacks
@@ -30,7 +43,20 @@ export const gameChat = chat.agent({
     return stored
   },
   onChatStart: async ({ chatId }) => {
-    if (!(await getGameSandboxId(chatId))) await createGameSandbox(chatId)
+    if (await getGameSandboxId(chatId)) return
+
+    const start = performance.now()
+
+    try {
+      await createGameSandbox(chatId)
+    } catch (error) {
+      logger.error(logger.fmt`Failed to create sandbox for game ${chatId}`, {
+        "game.id": chatId,
+        duration_ms: elapsed(start),
+        ...describeError(error),
+      })
+      throw error
+    }
   },
   // Store the token before any of the reply reaches the client, so a reload
   // mid-turn (including the first) resumes the stream instead of resending
@@ -43,12 +69,21 @@ export const gameChat = chat.agent({
     chatAccessToken,
     lastEventId,
   }) => {
-    await saveGameChat({
-      id: chatId,
-      messages: uiMessages,
-      chatAccessToken,
-      chatLastEventId: lastEventId,
-    })
+    try {
+      await saveGameChat({
+        id: chatId,
+        messages: uiMessages,
+        chatAccessToken,
+        chatLastEventId: lastEventId,
+      })
+    } catch (error) {
+      logger.error(logger.fmt`Failed to save finished turn of game ${chatId}`, {
+        "game.id": chatId,
+        "chat.message_count": uiMessages.length,
+        ...describeError(error),
+      })
+      throw error
+    }
   },
   run: async ({ messages, tools, signal }) =>
     streamText({

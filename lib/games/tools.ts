@@ -15,6 +15,7 @@ import {
   getGameSandbox,
   REPORT_FILE,
 } from "@/lib/daytona/utils"
+import { describeError, logger } from "@/lib/observability"
 
 const ENTRY_FILE = `${GAME_DIR}/index.html`
 const MAX_READ_BYTES = 128 * 1024
@@ -146,8 +147,23 @@ export function createGameTools(gameId: string) {
 
   // A step can call tools in parallel, and two edits of one file would
   // otherwise read the same content and lose one of the changes
-  function run<T>(action: (sandbox: Sandbox) => Promise<T>) {
-    const result = queue.then(() => attempt(action))
+  function run<T>(
+    toolName: string,
+    path: string,
+    action: (sandbox: Sandbox) => Promise<T>
+  ) {
+    // Only what attempt rethrows gets here: { ok: false } results are expected
+    const result = queue
+      .then(() => attempt(action))
+      .catch((error) => {
+        logger.error(logger.fmt`Tool ${toolName} failed in game ${gameId}`, {
+          "game.id": gameId,
+          "tool.name": toolName,
+          "tool.path": path,
+          ...describeError(error),
+        })
+        throw error
+      })
     queue = result.catch(() => {})
 
     return result
@@ -163,7 +179,7 @@ export function createGameTools(gameId: string) {
         path: pathSchema.optional().describe("Folder to list, default is all"),
       }),
       execute: ({ path = "." }) =>
-        run(async (sandbox) => {
+        run("list_files", path, async (sandbox) => {
           const entries = await sandbox.fs.listFiles(resolveGamePath(path), {
             depth: MAX_LIST_DEPTH,
           })
@@ -183,7 +199,7 @@ export function createGameTools(gameId: string) {
       description: `Read a text file of the game. Files over ${MAX_READ_BYTES / 1024}KB are cut off.`,
       inputSchema: z.object({ path: pathSchema }),
       execute: ({ path }) =>
-        run(async (sandbox) => {
+        run("read_file", path, async (sandbox) => {
           const file = await sandbox.fs.downloadFile(resolveGamePath(path))
 
           return {
@@ -201,7 +217,7 @@ export function createGameTools(gameId: string) {
         content: z.string().describe("The complete content of the file"),
       }),
       execute: ({ path, content }) =>
-        run(async (sandbox) => {
+        run("write_file", path, async (sandbox) => {
           const file = resolveWritablePath(path)
           const data = Buffer.from(content, "utf8")
 
@@ -225,7 +241,7 @@ export function createGameTools(gameId: string) {
           .describe("Replace every occurrence, default is false"),
       }),
       execute: ({ path, old_text, new_text, replace_all = false }) =>
-        run(async (sandbox) => {
+        run("replace_text", path, async (sandbox) => {
           const file = resolveWritablePath(path)
 
           if (!old_text) throw new ToolProblem("old_text must not be empty")
@@ -258,7 +274,7 @@ export function createGameTools(gameId: string) {
       description: "Delete a file of the game. index.html cannot be deleted.",
       inputSchema: z.object({ path: pathSchema }),
       execute: ({ path }) =>
-        run(async (sandbox) => {
+        run("delete_file", path, async (sandbox) => {
           const file = resolveWritablePath(path)
 
           if (file === ENTRY_FILE) {
