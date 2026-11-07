@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Build output of the Trigger.dev dev CLI
+    ".trigger/**",
     // Seeded into sandboxes as is, not part of this app
     "lib/games/runtime/**",
   ]),

@@ -25,6 +25,7 @@ export default async function Page(props: PageProps<"/">) {
   const { new: requestedNew } = await props.searchParams
   if (requestedNew === undefined) {
     const game = await getLatestGame()
+    // eslint-disable-next-line react-hooks/purity -- server component, renders once per request, so the clock read can't make re-renders diverge
     if (game && Date.now() - game.updatedAt.getTime() < REOPEN_GAME_WINDOW_MS) {
       redirect(`/games/${game.id}`)
     }
