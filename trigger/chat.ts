@@ -1,11 +1,9 @@
-import {
-  openai,
-  type OpenAILanguageModelResponsesOptions,
-} from "@ai-sdk/openai"
 import { chat, upsertIncomingMessage } from "@trigger.dev/sdk/ai"
 import { stepCountIs, streamText } from "ai"
+import { z } from "zod"
 
 import { createGameSandbox } from "@/lib/daytona/utils"
+import { getGameModelSettings } from "@/lib/games/agent"
 import {
   getGameMessages,
   getGameSandboxId,
@@ -14,14 +12,27 @@ import {
   saveGameMessages,
 } from "@/lib/games/chat-store"
 import { gameInstructions } from "@/lib/games/instructions"
+import { gameModelIds, resolveGameModelId } from "@/lib/games/model-catalog"
 import { createGameTools } from "@/lib/games/tools"
 import { describeError, elapsed, logger } from "@/lib/observability"
+
+// Optional as a whole: the transport sends no metadata without client data
+const clientDataSchema = z
+  .object({ modelId: z.enum(gameModelIds).optional() })
+  .optional()
 
 // The chat id is the game id, and the games row is the source of truth
 export const gameChat = chat.agent({
   id: "game-chat",
+  clientDataSchema,
   tools: ({ chatId }) => createGameTools(chatId),
-  hydrateMessages: async ({ chatId, turn, trigger, incomingMessages }) => {
+  hydrateMessages: async ({
+    chatId,
+    turn,
+    trigger,
+    incomingMessages,
+    clientData,
+  }) => {
     const stored = await getGameMessages(chatId)
     if (!stored) throw new Error(`Game ${chatId} not found`)
 
@@ -30,6 +41,7 @@ export const gameChat = chat.agent({
       "game.id": chatId,
       "chat.turn": turn,
       "chat.trigger": trigger,
+      "chat.model": resolveGameModelId(clientData?.modelId),
       "chat.stored_messages": stored.length,
       "chat.incoming_messages": incomingMessages.length,
     })
@@ -68,6 +80,7 @@ export const gameChat = chat.agent({
     uiMessages,
     chatAccessToken,
     lastEventId,
+    clientData,
   }) => {
     try {
       await saveGameChat({
@@ -80,25 +93,21 @@ export const gameChat = chat.agent({
       logger.error(logger.fmt`Failed to save finished turn of game ${chatId}`, {
         "game.id": chatId,
         "chat.message_count": uiMessages.length,
+        "chat.model": resolveGameModelId(clientData?.modelId),
         ...describeError(error),
       })
       throw error
     }
   },
-  run: async ({ messages, tools, signal }) =>
+  run: async ({ messages, tools, signal, clientData }) =>
     streamText({
       ...chat.toStreamTextOptions({ tools }),
-      model: openai("gpt-6-luna"),
+      ...getGameModelSettings(resolveGameModelId(clientData?.modelId)),
       instructions: gameInstructions,
       messages,
       abortSignal: signal,
       stopWhen: stepCountIs(40),
       // A whole game file must fit in one write_file call
       maxOutputTokens: 16000,
-      providerOptions: {
-        openai: {
-          reasoningEffort: "low",
-        } satisfies OpenAILanguageModelResponsesOptions,
-      },
     }),
 })
