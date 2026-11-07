@@ -21,6 +21,10 @@ export const gameModelCatalog = {
   },
 } satisfies Record<GameModelId, { name: string; tagline: string }>
 
+export function isGameModelId(value: unknown): value is GameModelId {
+  return gameModelIds.some((id) => id === value)
+}
+
 export function resolveGameModelId(modelId?: GameModelId) {
   return modelId ?? defaultGameModelId
 }

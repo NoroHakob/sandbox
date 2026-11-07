@@ -1,31 +1,22 @@
 "use client"
 
-import {
-  ArrowUpIcon,
-  ChevronDownIcon,
-  GripHorizontalIcon,
-  SquareIcon,
-} from "lucide-react"
+import { ArrowUpIcon, SquareIcon } from "lucide-react"
 
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+import { ModelPicker } from "@/components/model-picker"
 import {
   InputGroup,
   InputGroupAddon,
   InputGroupButton,
   InputGroupTextarea,
 } from "@/components/ui/input-group"
-
-const models = ["Kimi K3", "Claude Opus 5.5", "Claude Sonnet 5.5"]
+import type { GameModelId } from "@/lib/games/model-catalog"
 
 type ChatComposerProps = {
   value: string
   onValueChange: (value: string) => void
   onSubmit: (value: string) => void
+  modelId: GameModelId
+  onModelChange: (modelId: GameModelId) => void
   disabled?: boolean
   // When set, the send button becomes a stop button that calls it
   onStop?: () => void
@@ -36,6 +27,8 @@ export function ChatComposer({
   value,
   onValueChange,
   onSubmit,
+  modelId,
+  onModelChange,
   disabled = false,
   onStop,
   placeholder,
@@ -62,18 +55,7 @@ export function ChatComposer({
         disabled={disabled}
       />
       <InputGroupAddon align="block-end">
-        <DropdownMenu>
-          <DropdownMenuTrigger render={<InputGroupButton variant="ghost" />}>
-            <GripHorizontalIcon />
-            Kimi K3
-            <ChevronDownIcon />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent side="top" className="w-auto">
-            {models.map((model) => (
-              <DropdownMenuItem key={model}>{model}</DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <ModelPicker modelId={modelId} onModelChange={onModelChange} />
         {onStop ? (
           <InputGroupButton
             variant="default"

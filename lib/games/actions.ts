@@ -11,9 +11,10 @@ import { refresh } from "next/cache"
 import { redirect } from "next/navigation"
 
 import { db, games } from "@/lib/db"
+import { defaultGameModelId, isGameModelId } from "@/lib/games/model-catalog"
 import { describeError, elapsed } from "@/lib/observability"
 
-export async function createGame(prompt: string) {
+export async function createGame(prompt: string, modelId: string) {
   const { userId, orgId } = await auth()
   if (!userId) {
     logger.warn("Unauthorized game creation attempt")
@@ -26,6 +27,7 @@ export async function createGame(prompt: string) {
 
   const trimmed = prompt.trim()
   if (!trimmed) throw new Error("Prompt is required")
+  if (!isGameModelId(modelId)) throw new Error("Invalid model")
 
   const title = (await generateTitle(trimmed)) ?? truncate(trimmed)
 
@@ -54,13 +56,19 @@ export async function createGame(prompt: string) {
 
   logger.info(logger.fmt`Game ${game.id} created`, {
     "game.id": game.id,
+    "game.model": modelId,
     "org.id": orgId,
   })
 
   // Re-render the (app) layout so the sidebar picks up the new game
   refresh()
 
-  redirect(`/games/${game.id}`)
+  // The first turn runs on the game page, which reads the pick from the URL
+  redirect(
+    modelId === defaultGameModelId
+      ? `/games/${game.id}`
+      : `/games/${game.id}?model=${modelId}`
+  )
 }
 
 // Best effort: a failed or empty generation returns null so the caller falls back

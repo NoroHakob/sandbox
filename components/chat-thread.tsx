@@ -15,7 +15,7 @@ import {
 } from "ai"
 import { CheckIcon, CircleAlertIcon } from "lucide-react"
 import Image from "next/image"
-import { type FormEvent, useEffect, useRef, useState } from "react"
+import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
 import { Markdown } from "@/components/markdown"
@@ -43,6 +43,7 @@ import {
 } from "@/components/ui/questionnaire"
 import { Spinner } from "@/components/ui/spinner"
 import { mintChatAccessToken, startChatSession } from "@/lib/games/chat-actions"
+import type { GameModelId } from "@/lib/games/model-catalog"
 import type { createGameTools } from "@/lib/games/tools"
 import type { gameChat } from "@/trigger/chat"
 
@@ -190,20 +191,26 @@ function isAskPlayerAnswered({ messages }: { messages: GameMessage[] }) {
 
 export function ChatThread({
   gameId,
+  initialModelId,
   initialMessages,
   session,
   onTurnFinish,
 }: {
   gameId: string
+  initialModelId: GameModelId
   initialMessages: UIMessage[]
   // Stored after each turn, so a reload resumes the stream
   session?: ChatSessionPersistedState
   onTurnFinish?: () => void
 }) {
+  const [modelId, setModelId] = useState(initialModelId)
+  const clientData = useMemo(() => ({ modelId }), [modelId])
   const transport = useTriggerChatTransport<typeof gameChat>({
     task: "game-chat",
     accessToken: ({ chatId }) => mintChatAccessToken(chatId),
-    startSession: ({ chatId }) => startChatSession({ chatId }),
+    startSession: ({ chatId, clientData }) =>
+      startChatSession({ chatId, clientData }),
+    clientData,
     sessions: session && { [gameId]: session },
   })
   const { messages, sendMessage, addToolOutput, stop, status } =
@@ -356,6 +363,8 @@ export function ChatThread({
           value={input}
           onValueChange={setInput}
           onSubmit={submit}
+          modelId={modelId}
+          onModelChange={setModelId}
           disabled={generating || !!pendingQuestion}
           onStop={generating ? cancel : undefined}
           placeholder="Ask for a change…"

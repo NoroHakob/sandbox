@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { logger } from "@sentry/nextjs"
 import { auth as triggerAuth } from "@trigger.dev/sdk"
-import { chat } from "@trigger.dev/sdk/ai"
+import { chat, type InferChatClientData } from "@trigger.dev/sdk/ai"
 
 import { getGame } from "@/lib/games/queries"
 import { describeError } from "@/lib/observability"
@@ -31,11 +31,17 @@ async function requireGame(chatId: string) {
   }
 }
 
-export async function startChatSession({ chatId }: { chatId: string }) {
+export async function startChatSession({
+  chatId,
+  clientData,
+}: {
+  chatId: string
+  clientData?: InferChatClientData<typeof gameChat>
+}) {
   await requireGame(chatId)
 
   try {
-    return await startSession({ chatId })
+    return await startSession({ chatId, clientData })
   } catch (error) {
     logger.error(logger.fmt`Failed to start chat session for game ${chatId}`, {
       "game.id": chatId,
