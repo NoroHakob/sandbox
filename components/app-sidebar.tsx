@@ -143,7 +143,10 @@ export function AppSidebar({
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton>
+            <SidebarMenuButton
+              render={<Link href="/billing" />}
+              isActive={pathname === "/billing"}
+            >
               <CoinsIcon />
               <span>Credits</span>
             </SidebarMenuButton>
