@@ -15,6 +15,7 @@ import {
 } from "ai"
 import { CheckIcon, CircleAlertIcon } from "lucide-react"
 import Image from "next/image"
+import { useRouter } from "next/navigation"
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
@@ -203,6 +204,7 @@ export function ChatThread({
   session?: ChatSessionPersistedState
   onTurnFinish?: () => void
 }) {
+  const router = useRouter()
   const [modelId, setModelId] = useState(initialModelId)
   const clientData = useMemo(() => ({ modelId }), [modelId])
   const transport = useTriggerChatTransport<typeof gameChat>({
@@ -221,6 +223,11 @@ export function ChatThread({
       transport,
       resume: !!session,
       sendAutomaticallyWhen: isAskPlayerAnswered,
+      // The agent sends this after charging a step. The balance is rendered by
+      // the server layout, so refresh it to show the new amount
+      onData: (part) => {
+        if (part.type === "data-credits") router.refresh()
+      },
       onFinish: () => onTurnFinish?.(),
     })
   const [input, setInput] = useState("")
