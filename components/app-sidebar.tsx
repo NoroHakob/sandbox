@@ -33,9 +33,12 @@ import type { Game } from "@/lib/db/schema"
 
 export function AppSidebar({
   games,
+  credits,
   ...props
 }: React.ComponentProps<typeof Sidebar> & {
   games: Pick<Game, "id" | "title">[]
+  // Formatted balance of the active org, null without one
+  credits: string | null
 }) {
   const pathname = usePathname()
   const [recentsOpen, setRecentsOpen] = useState(false)
@@ -150,7 +153,7 @@ export function AppSidebar({
               <CoinsIcon />
               <span>Credits</span>
             </SidebarMenuButton>
-            <SidebarMenuBadge>$1.00</SidebarMenuBadge>
+            {credits !== null && <SidebarMenuBadge>{credits}</SidebarMenuBadge>}
           </SidebarMenuItem>
         </SidebarMenu>
         <div className="flex items-center justify-between gap-2 px-2 group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">

@@ -1,16 +1,16 @@
 import { PricingTable } from "@clerk/nextjs"
 import { auth } from "@clerk/nextjs/server"
 
-// Stand-in until credits are metered: there is no balance to read yet
-const AVAILABLE_CREDITS_USD = 8.8
-
-const usd = new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-})
+import { formatCredits } from "@/lib/billing/format"
+import { FREE_CREDITS, getCreditBalance } from "@/lib/billing/ledger"
+import { reconcileCredits } from "@/lib/billing/reconcile"
 
 export default async function Page() {
-  await auth.protect({ unauthenticatedUrl: "/sign-in" })
+  const { orgId } = await auth.protect({ unauthenticatedUrl: "/sign-in" })
+
+  // Grant any paid months before reading, so a new subscription shows up here
+  if (orgId) await reconcileCredits(orgId)
+  const balance = orgId ? await getCreditBalance(orgId) : FREE_CREDITS
 
   return (
     <div className="flex min-h-svh flex-col">
@@ -23,7 +23,7 @@ export default async function Page() {
             Available credits
           </h2>
           <p className="text-4xl font-semibold tracking-tight tabular-nums">
-            {usd.format(AVAILABLE_CREDITS_USD)}
+            {formatCredits(balance)}
           </p>
           <p className="text-sm text-muted-foreground">
             Credits cover the models that build and revise your games. A build
