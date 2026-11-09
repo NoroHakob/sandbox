@@ -5,6 +5,7 @@ import type { InferChatUIMessageFromTools } from "@trigger.dev/sdk/ai"
 import type { ChatSessionPersistedState } from "@trigger.dev/sdk/chat"
 import { useTriggerChatTransport } from "@trigger.dev/sdk/chat/react"
 import {
+  type ChatTransport,
   type DynamicToolUIPart,
   getToolName,
   type InferUITools,
@@ -12,6 +13,7 @@ import {
   lastAssistantMessageIsCompleteWithToolCalls,
   type ToolUIPart,
   type UIMessage,
+  type UIMessageChunk,
 } from "ai"
 import { CheckIcon, CircleAlertIcon } from "lucide-react"
 import Image from "next/image"
@@ -254,12 +256,44 @@ export function ChatThread({
     clientData,
     sessions: session && { [gameId]: session },
   })
+  // The stored reply a resumed turn may continue, read once on mount. Only a
+  // thread ending on a reply can be continued; otherwise nothing is filtered
+  const [resumedHeadId] = useState(() => {
+    const head = initialMessages.at(-1)
+    return head?.role === "assistant" ? head.id : undefined
+  })
+  const chatTransport = useMemo(
+    (): ChatTransport<GameMessage> => ({
+      sendMessages: (options) => transport.sendMessages(options),
+      // A turn that continues a message, such as the reply to an ask_player
+      // answer, starts with that message's id. A resumed stream starts from an
+      // empty message, so useChat would replace the stored one with it and drop
+      // the question and answer. Without the chunk, the rest of the turn is
+      // appended as its own message instead
+      reconnectToStream: async (options) => {
+        const stream = await transport.reconnectToStream(options)
+        if (!stream || !resumedHeadId) return stream
+
+        return stream.pipeThrough(
+          new TransformStream<UIMessageChunk, UIMessageChunk>({
+            transform(chunk, controller) {
+              if (chunk.type === "start" && chunk.messageId === resumedHeadId) {
+                return
+              }
+              controller.enqueue(chunk)
+            },
+          })
+        )
+      },
+    }),
+    [transport, resumedHeadId]
+  )
   const { messages, sendMessage, addToolOutput, stop, status, error } =
     useChat<GameMessage>({
       id: gameId,
       // Stored as plain UIMessages, with the shape the tools produced
       messages: initialMessages as GameMessage[],
-      transport,
+      transport: chatTransport,
       resume: !!session,
       sendAutomaticallyWhen: isAskPlayerAnswered,
       // The agent sends this after charging a step. The balance is rendered by

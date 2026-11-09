@@ -41,13 +41,6 @@ export async function saveGameMessages(id: string, messages: UIMessage[]) {
   await db.update(games).set({ messages }).where(eq(games.id, id))
 }
 
-export async function saveGameChatAccessToken(
-  id: string,
-  chatAccessToken: string
-) {
-  await db.update(games).set({ chatAccessToken }).where(eq(games.id, id))
-}
-
 export async function saveGameChat({
   id,
   messages,
@@ -57,7 +50,7 @@ export async function saveGameChat({
   id: string
   messages: UIMessage[]
   chatAccessToken: string
-  chatLastEventId: string | undefined
+  chatLastEventId?: string
 }) {
   await db
     .update(games)

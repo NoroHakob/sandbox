@@ -13,7 +13,6 @@ import {
   getGameOrgId,
   getGameSandboxId,
   saveGameChat,
-  saveGameChatAccessToken,
   saveGameMessages,
 } from "@/lib/games/chat-store"
 import { gameInstructions } from "@/lib/games/instructions"
@@ -151,10 +150,27 @@ export const gameChat = chat.agent({
       throw error
     }
   },
-  // Store the token before any of the reply reaches the client, so a reload
-  // mid-turn (including the first) resumes the stream instead of resending
-  onTurnStart: ({ chatId, chatAccessToken }) => {
-    chat.deferBeforeOutput(saveGameChatAccessToken(chatId, chatAccessToken))
+  // Store the thread and token before any of the reply reaches the client, so
+  // a reload mid-turn (including the first) resumes the stream instead of
+  // resending. The thread carries this turn's merged input, such as an
+  // ask_player answer, which would otherwise wait for onTurnComplete and be
+  // asked again after a reload. The stored cursor is left at the previous
+  // turn's end, so the resumed stream replays this whole turn
+  onTurnStart: ({ chatId, uiMessages, chatAccessToken }) => {
+    chat.deferBeforeOutput(
+      saveGameChat({ id: chatId, messages: uiMessages, chatAccessToken }).catch(
+        (error: unknown) => {
+          logger.error(
+            logger.fmt`Failed to save started turn of game ${chatId}`,
+            {
+              "game.id": chatId,
+              "chat.message_count": uiMessages.length,
+              ...describeError(error),
+            }
+          )
+        }
+      )
+    )
   },
   onTurnComplete: async ({
     chatId,
@@ -182,6 +198,22 @@ export const gameChat = chat.agent({
   },
   run: async ({ chatId, messages, tools, signal, clientData }) => {
     const modelId = resolveGameModelId(clientData?.modelId)
+
+    // Nothing to answer: the thread already ends on a reply, as when it was
+    // submitted twice or a tab requests a reply it already got. Generate and
+    // charge nothing. An answered ask_player ends on a tool message, not here
+    if (messages.at(-1)?.role === "assistant") {
+      logger.warn(
+        logger.fmt`Skipped turn of game ${chatId}: thread ends on a reply`,
+        {
+          "game.id": chatId,
+          "chat.model": modelId,
+          "chat.message_count": messages.length,
+        }
+      )
+      return
+    }
+
     // Looked up on the first charge and reused for the turn's later steps.
     // A failed lookup is retried on the next step rather than cached
     let orgId: Promise<string | null> | undefined
