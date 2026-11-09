@@ -3,7 +3,6 @@ import Image from "next/image"
 import { redirect } from "next/navigation"
 
 import { NewGameComposer } from "@/components/new-game-composer"
-import { Button } from "@/components/ui/button"
 import {
   Empty,
   EmptyContent,
@@ -13,7 +12,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty"
 import { getLatestGame } from "@/lib/games/queries"
-import { suggestions } from "@/lib/games/suggestions"
 
 // The home page reopens a game active within this window
 const REOPEN_GAME_WINDOW_MS = 30 * 60 * 1000
@@ -48,14 +46,6 @@ export default async function Page(props: PageProps<"/">) {
         </EmptyHeader>
         <EmptyContent className="max-w-3xl gap-6">
           <NewGameComposer />
-          <div className="flex flex-wrap justify-center gap-2">
-            {suggestions.map(({ icon: Icon, label }) => (
-              <Button key={label} variant="outline" className="rounded-full">
-                <Icon />
-                {label}
-              </Button>
-            ))}
-          </div>
         </EmptyContent>
       </Empty>
     </div>

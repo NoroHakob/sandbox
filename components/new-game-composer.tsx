@@ -3,8 +3,10 @@
 import { useState, useTransition } from "react"
 
 import { ChatComposer } from "@/components/chat-composer"
+import { Button } from "@/components/ui/button"
 import { createGame } from "@/lib/games/actions"
 import { defaultGameModelId, type GameModelId } from "@/lib/games/model-catalog"
+import { suggestions } from "@/lib/games/suggestions"
 
 export function NewGameComposer() {
   const [prompt, setPrompt] = useState("")
@@ -19,14 +21,30 @@ export function NewGameComposer() {
   }
 
   return (
-    <ChatComposer
-      value={prompt}
-      onValueChange={setPrompt}
-      onSubmit={submit}
-      modelId={modelId}
-      onModelChange={setModelId}
-      disabled={isPending}
-      placeholder="Describe the game you want to build..."
-    />
+    <>
+      <ChatComposer
+        value={prompt}
+        onValueChange={setPrompt}
+        onSubmit={submit}
+        modelId={modelId}
+        onModelChange={setModelId}
+        disabled={isPending}
+        placeholder="Describe the game you want to build..."
+      />
+      <div className="flex flex-wrap justify-center gap-2">
+        {suggestions.map(({ icon: Icon, label, prompt: suggestionPrompt }) => (
+          <Button
+            key={label}
+            variant="outline"
+            className="rounded-full"
+            disabled={isPending}
+            onClick={() => submit(suggestionPrompt)}
+          >
+            <Icon />
+            {label}
+          </Button>
+        ))}
+      </div>
+    </>
   )
 }
