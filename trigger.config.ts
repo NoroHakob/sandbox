@@ -1,8 +1,63 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+
 import { sentryEsbuildPlugin } from "@sentry/esbuild-plugin";
-import { esbuildPlugin } from "@trigger.dev/build/extensions";
+import {
+  esbuildPlugin,
+  type BuildExtension,
+} from "@trigger.dev/build/extensions";
 import { additionalFiles } from "@trigger.dev/build/extensions/core";
 import { defineConfig } from "@trigger.dev/sdk";
 import { config } from "dotenv";
+
+const DAYTONA_SDK = "@daytona/sdk";
+
+// @daytona/sdk loads form-data, tar and fast-glob through a require held in a
+// variable, so esbuild never bundles them and a deployed worker, which has no
+// node_modules, fails on file uploads. build.external can't fix it: the CLI
+// takes the name from the nearest package.json, @daytona/sdk/cjs/package.json,
+// which has none, and drops the external. So the plugin marks it external and
+// the layer installs the sdk with its dependencies. Deploy only: trigger dev
+// runs against the local node_modules
+function daytonaSdk(): BuildExtension {
+  return {
+    name: "daytona-sdk",
+    installedPackagesForTarget: (target) =>
+      target === "deploy" ? [DAYTONA_SDK] : [],
+    onBuildStart(context) {
+      if (context.target !== "deploy") return;
+
+      context.registerPlugin(
+        {
+          name: "daytona-sdk-external",
+          setup(build) {
+            build.onResolve({ filter: /^@daytona\/sdk(\/.*)?$/ }, (args) => ({
+              path: args.path,
+              external: true,
+            }));
+          },
+        },
+        { placement: "first", target: "deploy" },
+      );
+    },
+    onBuildComplete(context) {
+      if (context.target !== "deploy") return;
+
+      // The installed version, so the worker runs what was typechecked
+      const { version } = JSON.parse(
+        readFileSync(
+          join(context.workingDir, "node_modules", DAYTONA_SDK, "package.json"),
+          "utf8",
+        ),
+      ) as { version: string };
+
+      context.addLayer({
+        id: "daytona-sdk",
+        dependencies: { [DAYTONA_SDK]: version },
+      });
+    },
+  };
+}
 
 // `trigger deploy` evaluates this file before it loads .env.local, so the
 // process.env.SENTRY_* reads below would be undefined without this.
@@ -28,8 +83,9 @@ export default defineConfig({
   },
   dirs: ["trigger"],
   build: {
-    // Seeded into each new sandbox and never imported, so bundling would miss them
     extensions: [
+      daytonaSdk(),
+      // Seeded into each new sandbox and never imported, so bundling would miss them
       additionalFiles({ files: ["lib/games/runtime/**/*"] }),
       esbuildPlugin(
         sentryEsbuildPlugin({
