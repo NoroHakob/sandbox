@@ -5,6 +5,7 @@ import { logger } from "@sentry/nextjs"
 import { auth as triggerAuth } from "@trigger.dev/sdk"
 import { chat, type InferChatClientData } from "@trigger.dev/sdk/ai"
 
+import { canStartBuild } from "@/lib/billing/gate"
 import { getGame } from "@/lib/games/queries"
 import { describeError } from "@/lib/observability"
 import type { gameChat } from "@/trigger/chat"
@@ -29,6 +30,8 @@ async function requireGame(chatId: string) {
     })
     throw new Error("Not found")
   }
+
+  return game
 }
 
 export async function startChatSession({
@@ -38,7 +41,20 @@ export async function startChatSession({
   chatId: string
   clientData?: InferChatClientData<typeof gameChat>
 }) {
-  await requireGame(chatId)
+  const game = await requireGame(chatId)
+
+  // Starting a session runs the first turn, so an empty org never gets a run.
+  // Later turns go straight to the run, which checks again
+  if (!(await canStartBuild(game.orgId))) {
+    logger.info(
+      logger.fmt`Blocked chat session for game ${chatId}: no credits`,
+      {
+        "game.id": chatId,
+        "org.id": game.orgId,
+      }
+    )
+    return { outOfCredits: true } as const
+  }
 
   try {
     return await startSession({ chatId, clientData })

@@ -15,6 +15,7 @@ import {
 } from "ai"
 import { CheckIcon, CircleAlertIcon } from "lucide-react"
 import Image from "next/image"
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { type FormEvent, useEffect, useMemo, useRef, useState } from "react"
 
@@ -43,6 +44,10 @@ import {
   QuestionnaireTitle,
 } from "@/components/ui/questionnaire"
 import { Spinner } from "@/components/ui/spinner"
+import {
+  OUT_OF_CREDITS_ERROR,
+  OUT_OF_CREDITS_PART,
+} from "@/lib/billing/out-of-credits"
 import { mintChatAccessToken, startChatSession } from "@/lib/games/chat-actions"
 import type { GameModelId } from "@/lib/games/model-catalog"
 import type { createGameTools } from "@/lib/games/tools"
@@ -172,6 +177,35 @@ function AskPlayerAnswer({
   )
 }
 
+function OutOfCreditsNotice() {
+  return (
+    <div className="flex w-full flex-col gap-1 rounded-lg border p-4 text-sm">
+      <p className="font-medium">You&apos;re out of credits</p>
+      <p className="text-muted-foreground">
+        This build didn&apos;t start. Add credits on the{" "}
+        <Link href="/billing" className="text-foreground underline">
+          billing page
+        </Link>
+        , then send your message again.
+      </p>
+    </div>
+  )
+}
+
+function AssistantAvatar() {
+  return (
+    <MessageAvatar className="size-8 self-start rounded-lg bg-transparent">
+      <Image
+        src="/logo.svg"
+        alt="Sandbox"
+        width={32}
+        height={32}
+        className="size-8"
+      />
+    </MessageAvatar>
+  )
+}
+
 // The helper alone also matches a turn that ended on a server tool step, such
 // as one cut off by the step limit, which would start a new turn by itself
 function isAskPlayerAnswered({ messages }: { messages: GameMessage[] }) {
@@ -210,12 +244,17 @@ export function ChatThread({
   const transport = useTriggerChatTransport<typeof gameChat>({
     task: "game-chat",
     accessToken: ({ chatId }) => mintChatAccessToken(chatId),
-    startSession: ({ chatId, clientData }) =>
-      startChatSession({ chatId, clientData }),
+    // A blocked start comes back as a value, as server action errors are
+    // redacted in production. Thrown here, it reaches useChat's error intact
+    startSession: async ({ chatId, clientData }) => {
+      const result = await startChatSession({ chatId, clientData })
+      if ("outOfCredits" in result) throw new Error(OUT_OF_CREDITS_ERROR)
+      return result
+    },
     clientData,
     sessions: session && { [gameId]: session },
   })
-  const { messages, sendMessage, addToolOutput, stop, status } =
+  const { messages, sendMessage, addToolOutput, stop, status, error } =
     useChat<GameMessage>({
       id: gameId,
       // Stored as plain UIMessages, with the shape the tools produced
@@ -281,17 +320,7 @@ export function ChatThread({
               {messages.map((message) => (
                 <MessageScrollerItem key={message.id} messageId={message.id}>
                   <Message align={message.role === "user" ? "end" : "start"}>
-                    {message.role === "assistant" && (
-                      <MessageAvatar className="size-8 self-start rounded-lg bg-transparent">
-                        <Image
-                          src="/logo.svg"
-                          alt="Sandbox"
-                          width={32}
-                          height={32}
-                          className="size-8"
-                        />
-                      </MessageAvatar>
-                    )}
+                    {message.role === "assistant" && <AssistantAvatar />}
                     <MessageContent>
                       <Bubble
                         variant={
@@ -344,6 +373,11 @@ export function ChatThread({
                               )
                             }
 
+                            // The reply of a turn the run blocked
+                            if (part.type === OUT_OF_CREDITS_PART) {
+                              return <OutOfCreditsNotice key={index} />
+                            }
+
                             if (part.type !== "text") return null
 
                             return message.role === "assistant" ? (
@@ -360,6 +394,22 @@ export function ChatThread({
                   </Message>
                 </MessageScrollerItem>
               ))}
+              {/* A session start was blocked, so no run exists to reply. Not
+                  stored: useChat clears it when the next message is sent */}
+              {error?.message === OUT_OF_CREDITS_ERROR && (
+                <MessageScrollerItem messageId="out-of-credits">
+                  <Message align="start">
+                    <AssistantAvatar />
+                    <MessageContent>
+                      <Bubble variant="ghost" align="start">
+                        <BubbleContent className="flex flex-col items-start gap-2">
+                          <OutOfCreditsNotice />
+                        </BubbleContent>
+                      </Bubble>
+                    </MessageContent>
+                  </Message>
+                </MessageScrollerItem>
+              )}
             </MessageScrollerContent>
           </MessageScrollerViewport>
           <MessageScrollerButton />

@@ -1,18 +1,14 @@
-import "server-only"
+// No "server-only": the Trigger.dev worker reconciles before blocking a turn,
+// so this uses the plain backend client and the unguarded db client
 
-import { clerkClient } from "@clerk/nextjs/server"
+import { type BillingSubscriptionItem, createClerkClient } from "@clerk/backend"
 
-import { creditLedger, db, type NewCreditLedgerEntry } from "@/lib/db"
+import { creditLedger, db, type NewCreditLedgerEntry } from "@/lib/db/client"
 import { describeError, logger } from "@/lib/observability"
 import { NANODOLLARS_PER_DOLLAR } from "./format"
 
-type BillingSubscriptionItem = Awaited<
-  ReturnType<
-    Awaited<
-      ReturnType<typeof clerkClient>
-    >["billing"]["getOrganizationBillingSubscription"]
-  >
->["subscriptionItems"][number]
+// The worker has no Next.js request for clerkClient() to read its config from
+const clerk = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY })
 
 export const MONTHLY_GRANT = BigInt(10) * NANODOLLARS_PER_DOLLAR
 
@@ -65,13 +61,12 @@ function paidMonths(item: BillingSubscriptionItem, now: number) {
 
 // Grants $10 for each month the org has paid for. Keyed by subscription item
 // and month index, so an item's history is stable and a reload or a race can't
-// grant a month twice. Never throws: the caller is a page that must render
-// regardless
+// grant a month twice. Returns how many months were newly granted. Never
+// throws: callers are a page that must render and a turn that must not crash
 export async function reconcileCredits(orgId: string) {
   try {
-    const client = await clerkClient()
     const subscription =
-      await client.billing.getOrganizationBillingSubscription(orgId)
+      await clerk.billing.getOrganizationBillingSubscription(orgId)
 
     const now = Date.now()
     const rows: NewCreditLedgerEntry[] = subscription.subscriptionItems
@@ -83,7 +78,7 @@ export async function reconcileCredits(orgId: string) {
           amount: MONTHLY_GRANT,
         }))
       )
-    if (rows.length === 0) return
+    if (rows.length === 0) return 0
 
     const granted = await db
       .insert(creditLedger)
@@ -99,10 +94,13 @@ export async function reconcileCredits(orgId: string) {
         entryKeys: granted.map((row) => row.entryKey).join(","),
       })
     }
+
+    return granted.length
   } catch (error) {
     logger.error("Failed to reconcile credits", {
       orgId,
       ...describeError(error),
     })
+    return 0
   }
 }

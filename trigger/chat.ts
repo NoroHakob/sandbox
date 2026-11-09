@@ -2,7 +2,9 @@ import { chat, upsertIncomingMessage } from "@trigger.dev/sdk/ai"
 import { type StepResult, stepCountIs, streamText, type ToolSet } from "ai"
 import { z } from "zod"
 
+import { canStartBuild } from "@/lib/billing/gate"
 import { chargeStep } from "@/lib/billing/ledger"
+import { OUT_OF_CREDITS_PART } from "@/lib/billing/out-of-credits"
 import { priceUsage } from "@/lib/billing/pricing"
 import { createGameSandbox } from "@/lib/daytona/utils"
 import { getGameModelSettings } from "@/lib/games/agent"
@@ -65,6 +67,39 @@ async function chargeGameStep({
       ...describeError(error),
     })
   }
+}
+
+// Whether this turn may build. Checked once at the start of the turn and never
+// between steps, so a build already running finishes even below zero. Never
+// throws: an unknown org lets the turn run, and its charges log the problem
+async function canBuildTurn({
+  chatId,
+  getOrgId,
+}: {
+  chatId: string
+  getOrgId: () => Promise<string | null>
+}) {
+  let orgId: string | null
+  try {
+    orgId = await getOrgId()
+  } catch (error) {
+    logger.error(logger.fmt`Failed to look up the org of game ${chatId}`, {
+      "game.id": chatId,
+      ...describeError(error),
+    })
+    return true
+  }
+  if (!orgId) return true
+
+  const allowed = await canStartBuild(orgId)
+  if (!allowed) {
+    logger.info(logger.fmt`Blocked a turn of game ${chatId}: no credits`, {
+      "game.id": chatId,
+      "org.id": orgId,
+    })
+  }
+
+  return allowed
 }
 
 // The chat id is the game id, and the games row is the source of truth
@@ -155,6 +190,13 @@ export const gameChat = chat.agent({
         orgId = undefined
         throw error
       }))
+
+    // Reply with a notice instead of calling the model. It is saved with the
+    // thread like any reply, so a reload still shows why nothing was built
+    if (!(await canBuildTurn({ chatId, getOrgId }))) {
+      chat.response.write({ type: OUT_OF_CREDITS_PART, data: {} })
+      return
+    }
 
     return streamText({
       ...chat.toStreamTextOptions({ tools }),
