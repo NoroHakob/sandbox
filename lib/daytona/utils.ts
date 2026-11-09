@@ -1,4 +1,9 @@
-import { DaytonaConflictError, type Sandbox } from "@daytona/sdk"
+import {
+  DaytonaConflictError,
+  DaytonaGoneError,
+  DaytonaNotFoundError,
+  type Sandbox,
+} from "@daytona/sdk"
 import { eq } from "drizzle-orm"
 
 import { daytona } from "@/lib/daytona/client"
@@ -115,6 +120,69 @@ export async function getGameSandbox(gameId: string) {
   await syncEngine(sandbox)
 
   return { sandbox }
+}
+
+// Deletes every sandbox labeled with the game, plus the stored one in case its
+// label is missing. Never throws: the caller decides what a failure means, so
+// it gets back the ids that could not be deleted
+export async function deleteGameSandboxes(
+  gameId: string,
+  storedSandboxId: string | null
+) {
+  const start = performance.now()
+  const sandboxes = new Map<string, Sandbox | null>()
+  const failed: string[] = []
+
+  try {
+    for await (const sandbox of daytona.list({ labels: { gameId } })) {
+      sandboxes.set(sandbox.id, sandbox)
+    }
+  } catch (error) {
+    // Without the listing, sandboxes may be left behind: report it as a failure
+    logger.error(logger.fmt`Failed to list sandboxes of game ${gameId}`, {
+      "game.id": gameId,
+      ...describeError(error),
+    })
+    failed.push(`label:gameId=${gameId}`)
+  }
+  if (storedSandboxId && !sandboxes.has(storedSandboxId)) {
+    sandboxes.set(storedSandboxId, null)
+  }
+
+  let deleted = 0
+  for (const [sandboxId, listed] of sandboxes) {
+    if (listed?.state === "destroyed" || listed?.state === "destroying") continue
+
+    try {
+      const sandbox = listed ?? (await daytona.get(sandboxId))
+      await daytona.delete(sandbox)
+      deleted++
+    } catch (error) {
+      // Already gone is what we wanted
+      if (
+        error instanceof DaytonaNotFoundError ||
+        error instanceof DaytonaGoneError
+      ) {
+        continue
+      }
+      logger.error(logger.fmt`Failed to delete sandbox ${sandboxId}`, {
+        "game.id": gameId,
+        "sandbox.id": sandboxId,
+        ...describeError(error),
+      })
+      failed.push(sandboxId)
+    }
+  }
+
+  logger.info(logger.fmt`Sandboxes of game ${gameId} deleted`, {
+    "game.id": gameId,
+    "sandbox.found": sandboxes.size,
+    "sandbox.deleted": deleted,
+    "sandbox.failed": failed.length,
+    duration_ms: elapsed(start),
+  })
+
+  return { failed }
 }
 
 async function isGameServerUp(sandbox: Sandbox) {

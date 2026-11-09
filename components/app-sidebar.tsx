@@ -7,6 +7,7 @@ import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { CoinsIcon, MessageSquareIcon, SquarePenIcon } from "lucide-react"
 
+import { GameActionsMenu } from "@/components/game-actions-menu"
 import { Empty, EmptyDescription, EmptyHeader } from "@/components/ui/empty"
 import {
   Popover,
@@ -24,6 +25,7 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
+  SidebarMenuAction,
   SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -100,6 +102,18 @@ export function AppSidebar({
                     >
                       <span>{game.title}</span>
                     </SidebarMenuButton>
+                    {/* SidebarMenuAction hides itself in icon mode. Stays
+                        visible while its menu is open */}
+                    <GameActionsMenu
+                      gameId={game.id}
+                      title={game.title}
+                      trigger={
+                        <SidebarMenuAction
+                          showOnHover
+                          className="data-popup-open:opacity-100"
+                        />
+                      }
+                    />
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

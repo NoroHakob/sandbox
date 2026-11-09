@@ -21,8 +21,9 @@ export function GameChat({
 
   return (
     // The group sets an inline height: 100%, which overrides a height class on
-    // it, so a fixed-height parent is what keeps scrolling inside the panels
-    <div className="h-svh">
+    // it, so this wrapper fills the rest of the page's h-svh column (below the
+    // header) and keeps scrolling inside the panels
+    <div className="min-h-0 flex-1">
       <ResizablePanelGroup orientation="horizontal">
         <ResizablePanel
           defaultSize="40"
