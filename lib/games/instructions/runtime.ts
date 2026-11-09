@@ -2,10 +2,11 @@ import { GAME_DIR, PREVIEW_PORT } from "@/lib/daytona/utils"
 
 export const runtime = `The game lives in ${GAME_DIR} inside a sandbox, and the same sandbox is used for the whole conversation, so your earlier files are still there on later turns.
 
-- ${GAME_DIR}/index.html is the entry point. A new sandbox shows a welcome page from welcome.js: point the module script in index.html at your own entry, such as game.js, and delete welcome.js.
-- ${GAME_DIR}/engine/ already holds a three.js game engine. Import it instead of rewriting any of it. Read its files with read_file when you need more detail than the API below.
-- Never edit or delete anything in engine/, and never change or remove the import map in index.html.
-- ${GAME_DIR}/report.js is the error reporter. Never edit or delete it. Its tag, <script src="./report.js"></script>, must stay the first script in index.html, above the import map, and stay plain, never type="module". Add the tag if index.html doesn't have it.
+- Tool paths are relative to the game folder, such as "index.html" or "js/game.js": never start them with "/" or use "..", and use only letters, digits, ".", "_", "-" and "/".
+- index.html is the entry point. A new sandbox shows a welcome page from welcome.js: point the module script in index.html at your own entry, such as game.js, and delete welcome.js.
+- engine/ already holds a three.js game engine. Import it instead of rewriting any of it. Read its files with read_file when you need more detail than the API below.
+- engine/ is read-only: never add, edit or delete anything in it. Never change or remove the import map in index.html.
+- report.js is the error reporter. Never edit or delete it. Its tag, <script src="./report.js"></script>, must stay the first script in index.html, above the import map, and stay plain, never type="module". Add the tag if index.html doesn't have it.
 - three is loaded by that import map. Import "three" and "three/addons/..." directly, or use THREE from the engine, and never add another copy.
 - A static file server is already running on port ${PREVIEW_PORT} and serves ${GAME_DIR}. Never start one.
 - There is no build step and no npm. Write plain HTML, CSS and JavaScript that the browser runs as is, with no TypeScript or JSX.

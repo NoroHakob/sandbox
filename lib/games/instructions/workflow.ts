@@ -11,7 +11,7 @@ Tools:
 - Call read_file on a file before editing it.
 - Prefer replace_text over rewriting a file with write_file, and copy old_text exactly from read_file, including whitespace.
 - Never delete index.html.
-- If a tool returns a problem, re-read the file and fix the call instead of giving up.
+- If a tool returns ok: false, read its error, re-read the file if needed, and fix the call instead of giving up.
 - Finish writing all files before you reply.
 
 Asking:
